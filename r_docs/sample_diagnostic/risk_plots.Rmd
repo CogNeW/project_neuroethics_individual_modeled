@@ -1,0 +1,140 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load library, include=FALSE}
+library(readr)
+library(dplyr)
+library(ggplot2)
+```
+
+```{r include=FALSE}
+data <- read.csv("../data/Cleaned_Pilot.02.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE) %>%
+    select(user_id, risk, gain, no_effect, experimental_treatment_selected, trial_index) %>%
+    filter(experimental_treatment_selected == 'Yes to treatment')
+
+
+data1 <- read.csv("../data/Cleaned_Pilot.02.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE) %>%
+    select(user_id, risk, gain, no_effect, experimental_treatment_selected, trial_index) %>%
+    filter(experimental_treatment_selected == 'No to treatment')
+
+
+
+data2 <- read.csv("../data/Cleaned_Pilot.01.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE) %>%
+    select(user_id, risk, gain, no_effect, experimental_treatment_selected, trial_index) %>%
+   filter(experimental_treatment_selected == 'Yes to treatment')%>%
+   filter(!risk >70)
+```
+
+Here is the overall trial distribution for Yes responces for all subject as a fuction of risk and the same thing expect for a filter showing only yes responces for risk less than 70.
+```{r overall trial distribution for risk, fig.height=5, fig.width=11}
+#Risk
+ggplot(data, aes(risk, fill = experimental_treatment_selected)) +
+    geom_histogram(binwidth=5, colour="black", fill="#ee7c2e") + 
+    geom_vline(aes(xintercept=mean(risk, na.rm=T)),
+               color="red", linetype="dashed", size=1)+
+    scale_x_continuous("Risk of Harm", breaks=seq(0, 100, 5))+
+    scale_y_continuous("Count", breaks=seq(0, 300, 50), limits=c(0, 300))
+
+ggplot(data2, aes(risk, fill = experimental_treatment_selected)) +
+    geom_histogram(binwidth=5, colour="black", fill="#ee7c2e") + 
+    geom_vline(aes(xintercept=mean(risk, na.rm=T)),
+               color="red", linetype="dashed", size=1)+
+    scale_x_continuous("Risk of Harm", breaks=seq(0, 100, 5))+
+    scale_y_continuous("Count", breaks=seq(0, 300, 50), limits=c(0, 300))
+
+```
+
+Of course we do not expect the shape to change here because we are only limiting the amount of observations we are seeing! 
+
+
+But here is the overall trial distribution for Yes responces for all subject as a fuction of gain and no effect with its contrasting filter of risk responces at 70. 
+
+```{r gain trials, fig.height=5, fig.width=11}
+#Gain
+ggplot(data, aes(gain, fill = experimental_treatment_selected)) +
+    geom_histogram(binwidth=5, colour="black", fill="#4673c3") + 
+    geom_vline(aes(xintercept=mean(gain, na.rm=T)),
+               color="red", linetype="dashed", size=1)+
+    scale_x_continuous("Benifit", breaks=seq(0, 100, 5))+
+    scale_y_continuous("Count", breaks=seq(0, 300, 50), limits=c(0, 300))
+
+ggplot(data2, aes(gain, fill = experimental_treatment_selected)) +
+    geom_histogram(binwidth=5, colour="black", fill="#4673c3") + 
+    geom_vline(aes(xintercept=mean(gain, na.rm=T)),
+               color="red", linetype="dashed", size=1)+
+    scale_x_continuous("Benifit", breaks=seq(0, 100, 5))+
+    scale_y_continuous("Count", breaks=seq(0, 300, 50), limits=c(0, 300))
+```
+
+
+```{r no effect trials, fig.height=5, fig.width=11}
+#No Effect
+ggplot(data, aes(no_effect, fill = experimental_treatment_selected)) +   
+    geom_histogram(binwidth=5, colour="black", fill="#747474") + 
+    geom_vline(aes(xintercept=mean(no_effect, na.rm=T)),
+               color="red", linetype="dashed", size=1)+
+    scale_x_continuous("no effect", breaks=seq(0, 100, 5))+
+    scale_y_continuous("Count", breaks=seq(0, 300, 50), limits=c(0, 300))
+
+ggplot(data2, aes(no_effect, fill = experimental_treatment_selected)) + 
+    geom_histogram(binwidth=5, colour="black", fill="#747474") + 
+    geom_vline(aes(xintercept=mean(no_effect, na.rm=T)),
+               color="red", linetype="dashed", size=1)+
+    scale_x_continuous("no effect", breaks=seq(0, 100, 5))+
+    scale_y_continuous("Count", breaks=seq(0, 300, 50), limits=c(0, 300))
+```
+We can see a significant change in our gain. This is because if we sample less risk, we also are sampling less trials with low amounts of gain and no effect. For example, if I never have a trial with 90 risk, I also shrink the amount of trials with 5 gain. 
+
+So over subjects, do we see a significant change in the distributions from this filtering?
+
+
+```{r subject wise odds of Yes, fig.height=5, fig.width=11}
+##Risk
+#Before filter
+ggplot(data, aes(x=risk, color=user_id)) + geom_density()+
+  geom_vline(aes(xintercept=mean(risk, na.rm=T)),             color="red", linetype="dashed", size=1)+
+  scale_x_continuous("Risk of Harm", breaks=seq(0, 100, 5))+
+  theme(legend.position="none")
+#After filter
+ggplot(data, aes(x=risk, color=user_id)) + geom_density()+
+  geom_vline(aes(xintercept=mean(risk, na.rm=T)),             color="red", linetype="dashed", size=1)+
+  scale_x_continuous("Risk of Harm", breaks=seq(0, 100, 5))+
+  theme(legend.position="none")
+```
+
+```{r gain density, fig.height=5, fig.width=11}
+##Gain 
+#Before filter
+ggplot(data, aes(x=gain, color=user_id)) + geom_density()+
+  geom_vline(aes(xintercept=mean(gain, na.rm=T)),             color="red", linetype="dashed", size=1)+
+  scale_x_continuous("Benifit", breaks=seq(0, 100, 5))+
+  theme(legend.position="none")
+#After filter
+ggplot(data2, aes(x=gain, color=user_id)) + geom_density()+
+  geom_vline(aes(xintercept=mean(gain, na.rm=T)),             color="red", linetype="dashed", size=1)+
+  scale_x_continuous("Benifit", breaks=seq(0, 100, 5))+
+  theme(legend.position="none")
+```
+
+```{r no effect density, fig.height=5, fig.width=11}
+#No effect
+#Before filter
+ggplot(data, aes(x=no_effect, color=user_id)) + geom_density()+
+  geom_vline(aes(xintercept=mean(no_effect, na.rm=T)),             color="red", linetype="dashed", size=1)+
+  scale_x_continuous("No Effect", breaks=seq(0, 100, 5))+
+  theme(legend.position="none")
+#After filter
+ggplot(data2, aes(x=no_effect, color=user_id)) + geom_density()+
+  geom_vline(aes(xintercept=mean(no_effect, na.rm=T)),             color="red", linetype="dashed", size=1)+
+  scale_x_continuous("No Effect", breaks=seq(0, 100, 5))+
+  theme(legend.position="none")
+```
+
+

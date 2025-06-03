@@ -1,0 +1,630 @@
+---
+title: "mixed model group level"
+author: "Kianté Fernandez"
+date: "5/12/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load library, include=FALSE}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(GGally)
+library(gridExtra)
+library(reshape2)
+library(lmerTest)
+library(lme4)
+library(Hmisc)
+library(psych)
+library(car)
+library(knitr)
+```
+
+```{r load data set,include=FALSE}
+#cleaned data full
+data <- read.csv("../data/Cleaned_Pilot/Cleaned_Pilot.08.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE)%>%
+    dplyr::select(user_id, risk, gain, no_effect, condition, experimental_treatment_selected, trial_index, sex, age, education,race_ethnicity, Risk_Beta , Gain_Beta , Interaction_Beta, lambda, Yes, No, Risk_sig, Gain_sig, Interaction_sig)
+
+data$Risk_sig <-  factor(data$Risk_sig, levels = c(0,1), labels = c("Not Significant","Significant"))
+data$Gain_sig <-  factor(data$Gain_sig, levels = c(0,1), labels = c("Not Significant","Significant"))
+data$Interaction_sig <-  factor(data$Interaction_sig, levels = c(0,1), labels = c("Not Significant","Significant"))
+
+#data for h1
+data.h1 <- data %>% 
+   dplyr::select(user_id, sex,education,race_ethnicity,age,Risk_Beta,Gain_Beta,Interaction_Beta, Yes, No, Risk_sig, Gain_sig, Interaction_sig) %>% 
+  distinct()
+
+
+#long format
+data.h1.long <-
+  distinct(dplyr::select(data, user_id, Risk_Beta, Gain_Beta, Interaction_Beta)) %>% 
+  melt(id = "user_id", variable.name = "type", value.name = "Beta") 
+
+#h2 data long
+data.h2.long <- distinct(dplyr::select(data, user_id ,condition, trial_index,  Risk_Beta , Gain_Beta , Interaction_Beta)) %>% 
+  melt(id = c("user_id","condition", "trial_index"),
+                       variable.name = "type", 
+                       value.name = "Beta")
+
+#Outliers potentially
+#%>%  filter(user_id != "FIvIqXVg") %>%   filter(user_id != "tTZWd9tg") %>%  filter(user_id != "ZJ8tICU0") %>%   filter(user_id != "4lsMLrPn") %>%  filter(user_id != "0XnbWTTY") 
+
+#write.csv(data,paste("../data/",'john.csv',sep = ""))
+```
+
+
+##H1
+
+
+```{r}
+subset <- subset(data.h1.long, type != "Interaction_Beta")
+
+# Sort by beta type then user_id so that the t test function reads it
+subset <- subset[order(subset$type, subset$user_id), ]
+
+# Paired t-test
+t.test(Beta ~ type, subset, paired=TRUE)
+#said another way..
+t.test(data.h1$Risk_Beta - data.h1$Gain_Beta, mu=0, var.equal=TRUE)
+
+
+aov <- aov(Beta ~ type + Error(user_id/type), data=data.h1.long)
+summary(aov)
+model.tables(aov, "means")
+
+ggplot(subset, aes(x=type, y=Beta, fill=type)) + geom_boxplot()+
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", color = "red") + 
+    stat_summary(fun = mean, geom = "point", color = "red")
+```
+
+
+##H2 
+Participants risk aversion to harm will change as the cognitive domain being treated changes. Specifically, participants will be more risk averse to mood, and self-control because these are more central to self-identity.
+```{r lm}
+#subset <- subset(data.beta, type != "Interaction_Beta")
+lm.null <- lm(Beta ~ 1, data=data.h2.z.long)
+lm.0 <- lm(Beta ~ type, data=data.h2.z.long)
+
+lm.1 <- lm(Beta ~ type + condition, data=data.h2.z.long)
+
+lm.2 <- lm(Beta ~ type*condition, data=data.h2.z.long) 
+
+anova(lm.null, lm.0, lm.1, lm.2)
+summary(lm.2)
+
+library(multcomp)
+library(lsmeans)
+summary(glht(lm.2, lsm(pairwise ~ type + condition)), test=adjusted(type="holm"))
+#ggplot(data.h2.long, aes(type, Beta, color = condition)) +
+#  stat_summary(fun = mean, geom = "point") +
+#  stat_summary(fun.data = mean_cl_boot, geom = "pointrange") 
+```
+
+Q: is their an interaction between condition and beta type on beta weight?
+```{r Anova}
+#run a Mixed design ANOVA
+aov <- aov(Beta ~ condition*type + Error(user_id/type), data=data.h2.long)
+summary(aov)
+```
+
+We can take a multilevel model apporach by consider that trials happen over time and consider our between subject condition variable as a random effect term to which we vary by intercept and trial. Since we begin seeing boundary issues in our base model, we chose not to model trial as a random slope; this makes sense because we would not expect much variance across trials between conditions. 
+
+Further I am not sure after demonstrating trial does not have an effect that we would even include it within our model! 
+
+```{r multilevel model at the level of the group, fig.height=7, fig.width=12, dpi=300}
+
+#scale the continuous variables for modeling
+data.h2.long$trial_index.c <- scale(data.h2.long$trial_index)
+
+
+m.base <- lmer(Beta ~ trial_index +
+                      (1 |type:condition) + (1 | user_id), 
+                      data = data.h2.long,REML=F)
+#add beta term
+m.0 <- lmer(Beta ~ trial_index + type +
+                      (1 |type:condition) + (1 | user_id), 
+                      data = data.h2.long,REML=F)
+anova(m.base)
+#add cog domain
+m.1 <- lmer(Beta ~ trial_index + type + condition +
+                      (1 |type:condition) + (1 | user_id), 
+                      data = data.h2.long,REML=F)
+
+m.2 <- lmer(Beta ~ trial_index + type + condition + type:condition +
+                      (1 |type:condition) + (1 | user_id), 
+                      data = data.h2.long,REML=F, 
+                      control=lmerControl(optimizer="Nelder_Mead"))
+
+anova(m.base, m.0, m.1, m.2)
+
+plot(m.4, condition ~ resid(.), abline = 0 ) # generate diagnostic plots
+
+
+plot(m.4, resid(., type = "pearson") ~ fitted(.) | condition, id = 0.05, 
+     adj = -0.3, pch = 20, col = "gray40")
+
+# check homogeneity
+#Computes Levene's test for homogeneity of variance across groups.
+leveneTest(data.beta$Beta, data.beta$condition, center = mean)
+
+plot(m.4, pch = 20, col = "black", lty = "dotted")
+
+plot(m.4, form = resid(., type = "pearson") ~ fitted(.) | condition, abline = 0, 
+     cex = .5, pch = 20, col = "black")
+
+# observed responses versus the within-group fitted values
+plot(m.4, Beta ~ fitted(.), id = 0.05, adj = -0.3, cex = .8, pch = 20, col = "blue")
+
+
+ggplot(data.beta, aes(trial_index, Beta, color=condition)) +
+stat_summary(fun.data = mean_cl_boot, geom="pointrange") +
+stat_summary(aes(y=fitted(m.4)), fun=mean, geom="line")+
+labs(x= "Trial Index", y= "Beta")+
+   facet_wrap(~type)
+
+ggplot(data.beta, aes(condition, Beta, fill=type)) +
+  geom_boxplot()+
+  scale_y_continuous("Beta", breaks=seq(-7, 7,.5), limits=c(-7, 7)) +
+  theme(axis.text.x = element_text(angle=65, vjust=0.6)) +
+  labs(title="",
+       x="Cognitive Domian",
+       y="Beta")+
+  coord_flip()
+
+
+m.base <- lmer(Beta ~ type +
+                      (1 |user_id), 
+                      data = data.beta,REML=F)
+#add cog domain
+m.1 <- lmer(Beta ~   type + condition +
+                      (1 |user_id), 
+                      data = data.beta,REML=F)
+#adding interactions
+m.2 <- lmer(Beta ~  type*condition  +
+                      (1 |user_id), 
+                      data = data.beta,REML=F)
+
+anova(m.base, m.1, m.2)
+summary(m.2)
+``` 
+
+
+
+```{r logisitc mixed models}
+data$risk.c <- scale(data$risk)
+data$gain.c <- scale(data$gain)
+data$trial_index.c <- scale(data$trial_index)
+data$no_effect.c <- scale(data$no_effect)
+
+m.0 <- glmer(experimental_treatment_selected ~ trial_index.c + risk.c + gain.c +
+                   (1 + trial_index.c| user_id), 
+                   data = data, family = binomial, 
+                   control=glmerControl(optimizer="Nelder_Mead"))
+
+m.1 <- glmer(experimental_treatment_selected ~ trial_index.c + risk.c + gain.c + condition +
+                   (1 + trial_index.c | user_id), 
+                   data = data, family = binomial, 
+                   control=glmerControl(optimizer="Nelder_Mead"))
+
+m.2 <- glmer(experimental_treatment_selected ~ trial_index.c + risk.c*gain.c + condition +
+                   (1 | user_id), 
+                   data = data, family = binomial, 
+                   control=glmerControl(optimizer="Nelder_Mead"))
+
+m.3 <- glmer(experimental_treatment_selected ~ trial_index.c + (risk.c + gain.c + condition)^2 +
+                   (1 | user_id), 
+                   data = data, family = binomial, 
+                   control=glmerControl(optimizer="Nelder_Mead"))
+
+anova()
+
+```
+
+
+```{r binary logistic models}
+data1 <- dplyr::select(data, user_id ,condition, trial_index, risk, gain, experimental_treatment_selected, Yes) %>% 
+  melt(id = c("user_id","condition", "trial_index", "experimental_treatment_selected", "Yes"),
+                       variable.name = "effect", 
+                       value.name = "Percent.in.treatment")
+
+ #mutate(percent = Yes/N*100) 
+#N <- 75
+#data1$proportion <- data1$Percent.in.treatment/5 
+
+
+m.base <- glmer(experimental_treatment_selected ~ 1 +
+                   (Percent.in.treatment | user_id) + (0 + Percent.in.treatment |effect:user_id), 
+                   data = data1, family = binomial(link="logit"), 
+                   control=glmerControl(optimizer="bobyqa"),
+                   nAGQ = 0)
+
+m.0 <- glmer(experimental_treatment_selected ~ Percent.in.treatment +
+                   (Percent.in.treatment | user_id) + (0 + Percent.in.treatment |effect:user_id), 
+                   data = data1, family = binomial(link="logit"), 
+                   control=glmerControl(optimizer="bobyqa"),
+                   nAGQ = 0)
+
+
+m.1 <- glmer(experimental_treatment_selected ~ Percent.in.treatment + effect +
+                   (Percent.in.treatment | user_id) +  (0 + Percent.in.treatment |effect:user_id), 
+                   data = data1, family = binomial(link="logit"), 
+                   control=glmerControl(optimizer="bobyqa"),
+                   nAGQ = 0)
+
+m.2 <- glmer(experimental_treatment_selected ~ Percent.in.treatment*effect +
+                   (Percent.in.treatment | user_id) + (0 + Percent.in.treatment |effect:user_id), 
+                   data = data1, family = binomial(link="logit"), 
+                   control=glmerControl(optimizer="bobyqa"),
+                   nAGQ = 0)
+
+m.3 <- glmer(experimental_treatment_selected ~ Percent.in.treatment*effect + condition +
+                   (Percent.in.treatment | user_id) + (0 + Percent.in.treatment |effect:user_id), 
+                   data = data1, family = binomial(link="logit"), 
+                   control=glmerControl(optimizer="bobyqa"),
+                   nAGQ = 0)
+#^cannot get to converge.
+
+anova(m.base, m.0,m.1, m.2, m.3)
+
+
+
+ggplot(data1, aes(Percent.in.treatment, Yes/N, group = user_id, color = effect)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "pointrange", size =2)+
+  stat_summary(aes(y=fitted(m.3), linetype = effect), fun = mean, geom = "line", size =2)+
+  ylab("Outcome")+
+  theme_bw(base_size = 10)+
+  coord_cartesian(xlim = c(0,70))+
+  theme(legend.position = "none")
+
+
+plot(m.2, experimental_treatment_selected ~ resid(.), abline = 0 ) # generate diagnostic plots
+
+
+plot(m.2, resid(., type = "pearson") ~ fitted(.) | effect, id = 0.05, 
+     adj = -0.3, pch = 20, col = "gray40")
+
+
+plot(m.2, pch = 20, col = "black", lty = "dotted")
+
+plot(m.2, form = resid(., type = "pearson") ~ fitted(.) | effect, abline = 0, 
+     cex = .5, pch = 20, col = "black")
+
+# observed responses versus the within-group fitted values
+plot(m.2, experimental_treatment_selected ~ fitted(.), id = 0.05, adj = -0.3, cex = .8, pch = 20, col = "blue")
+
+```
+
+What about if we use the lambda value we calculated as our DV 
+```{r lambda tests}
+
+```
+
+
+```{r fitting poly to logit}
+foo <- poly(data1$Percent.in.treatment, 3)
+
+#add to original data
+data1[,paste(c("linear", "quadratic", "cubic"))] <-
+  foo[data1$Percent.in.treatment, 1:3]
+
+
+
+m.base <- glmer(experimental_treatment_selected ~ 1 +
+                   (linear + quadratic +  cubic | user_id) + (0 + linear  + quadratic |effect:user_id), 
+                   data = data1, family = binomial(link="logit"), 
+                   control=glmerControl(optimizer="bobyqa"),
+                   nAGQ = 0)
+
+
+m.0 <- glmer(experimental_treatment_selected ~ linear  +
+                   (linear + quadratic +  cubic | user_id) + (0 + linear  + quadratic |effect:user_id), 
+                   data = data1, family = binomial(link="logit"), 
+                   control=glmerControl(optimizer="bobyqa"),
+                   nAGQ = 0)
+
+
+m.1 <- glmer(experimental_treatment_selected ~ (linear + quadratic) +
+                   (linear + quadratic +  cubic | user_id) + (0 + linear  + quadratic |effect:user_id), 
+                   data = data1, family = binomial(link="logit"), 
+                   control=glmerControl(optimizer="bobyqa"),
+                   nAGQ = 0)
+
+m.2 <- glmer(experimental_treatment_selected ~ (linear + quadratic + cubic) +
+                   (linear + quadratic +  cubic | user_id) + (0 + linear  + quadratic |effect:user_id), 
+                   data = data1, family = binomial(link="logit"), 
+                   control=glmerControl(optimizer="bobyqa"),
+                   nAGQ = 0)
+
+m.3 <- glmer(experimental_treatment_selected ~ (linear + quadratic + cubic)*effect +
+                   (linear + quadratic +  cubic | user_id) + (0 + linear  + quadratic |effect:user_id), 
+                   data = data1, family = binomial(link="logit"), 
+                   control=glmerControl(optimizer="bobyqa"),
+                   nAGQ = 0)
+
+#m.4 <- glmer(experimental_treatment_selected ~ (linear + quadratic + cubic)*effect + condition +
+#                   (linear + quadratic +  cubic | user_id) + (0 + linear  + quadratic  |effect:user_id), 
+#                   data = data1, family = binomial(link="logit"), 
+#                   control=glmerControl(optimizer="bobyqa"),
+#                   nAGQ = 0)
+
+anova(m.base, m.0,m.1, m.2, m.3)
+
+
+summary(m.3)
+```
+
+
+```{r beta trial plots, fig.height=11, fig.width=14, dpi= 300}
+
+p1 <- ggplot(data, aes(trial_index, risk, color = experimental_treatment_selected)) +
+  stat_summary(fun = mean, geom = "point") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.3) +
+  theme_set(theme_bw(base_size = 10)) +
+  theme(legend.position = "top") +
+  labs(x = "", y = "Observed Risk") +
+  scale_color_manual(values = c("#f8766d", "#00bfc4"))+
+  scale_x_continuous("Trial Index", breaks=seq(1, 75, 1))+
+  scale_y_continuous("Risk", breaks=seq(5, 50, 5))
+
+p2 <- ggplot(data, aes(trial_index, gain, color = experimental_treatment_selected)) +
+  stat_summary(fun = mean, geom = "point") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.3) +
+  theme_set(theme_bw(base_size = 10)) +
+  theme(legend.position = "top") +
+  labs(x = "", y = "Observed Gain") +
+  scale_color_manual(values = c("#f8766d", "#00bfc4"))+
+  scale_x_continuous("Trial Index", breaks=seq(1, 75, 1))+
+  scale_y_continuous("Gain", breaks=seq(5, 50, 5))
+
+p3 <- ggplot(data, aes(trial_index, no_effect, color = experimental_treatment_selected)) +
+  stat_summary(fun = mean, geom = "point") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.3) +
+  theme_set(theme_bw(base_size = 10)) +
+  theme(legend.position = "top") +
+  labs(x = "", y = "Observed No Effect") +
+  scale_color_manual(values = c("#f8766d", "#00bfc4"))+
+  scale_x_continuous("Trial Index", breaks=seq(1, 75, 1))+
+  scale_y_continuous("No effect", breaks=seq(5, 50, 5))
+
+
+grid.arrange(p1, p2, p3, nrow = 3)
+```
+These show the average values for risk, gain, and no effect with bootstraped error bars across the trails. What I find most intresting about these is the pattern of responses for risk and gain. You can see some indication of consistent risk perferences with most risk trials having an average lower yes responses than nos, and vice versa for the gain trials.
+
+They also demonstrate what we have been speaking about in terms no effect no really showing any pattern of resonses. 
+
+
+```{r condition plots, fig.height=10, fig.width=14, dpi= 300}
+p3<- ggplot(data, aes(trial_index, risk, color = experimental_treatment_selected)) +
+  stat_summary(fun = mean, geom = "point") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.3) +
+  theme_set(theme_bw(base_size = 10)) +
+  theme(legend.position = "top") +
+  labs(x = "", y = "Observed Risk") +
+  scale_x_continuous("Trial Index", breaks=seq(1, 75, 1))+
+  scale_y_continuous("Risk", breaks=seq(5, 50, 5)) +
+  facet_wrap(~condition, scale="free")
+
+p4<- ggplot(data, aes(trial_index, gain, color = experimental_treatment_selected)) +
+  stat_summary(fun = mean, geom = "point") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.3) +
+  theme_set(theme_bw(base_size = 10)) +
+  theme(legend.position = "top") +
+  labs(x = "", y = "Observed Gain") +
+  scale_x_continuous("Trial Index", breaks=seq(1, 75, 1))+
+  scale_y_continuous("Gain", breaks=seq(5, 50, 5)) +
+  facet_wrap(~condition, scale="free")
+
+grid.arrange(p3, p4, nrow = 2)
+```
+
+
+```{r by condition beta plots}
+#ggplot(data.h1.r.long, aes(condition, Beta, fill=type)) +
+#  geom_boxplot()+
+#  theme(axis.text.x = element_text(angle=65, vjust=0.6)) +
+#  labs(title="",
+#       x="Cognitive Domian",
+#       y="Beta")
+
+#ggplot(data.beta, aes(condition, Beta, fill=type)) +
+#  geom_boxplot()+
+#  facet_wrap(~condition, scale="free")
+```
+
+
+```{r categorical interpretation matrix }
+#Create categorical interpretation matrix 
+
+contrasts.martix =  rbind(
+  "Attention vs. Language"                    = c(0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+  "Attention vs. Long Term Memory"            = c(0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+  "Attention vs. Mood"                        = c(0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+  "Attention vs. Motor Function"              = c(0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+  "Attention vs. Self Control"                = c(0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+  "Attention vs. Short Term Memory"           = c(0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+  
+  "Language vs. Long Term Memory"             = c(0,0,0,0,-1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+  "Language vs. Mood"                         = c(0,0,0,0,-1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+  "Language vs. Motor Function"               = c(0,0,0,0,-1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+  "Language vs. Self Control"                 = c(0,0,0,0,-1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+  "Language vs. Short Term Memory"            = c(0,0,0,0,-1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+ 
+  "Long Term Memory vs. Mood"                 = c(0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+  "Long Term Memory vs. Motor Function"       = c(0,0,0,0,0,-1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+  "Long Term Memory vs. Self Control"         = c(0,0,0,0,0,-1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+  "Long Term Memory vs. Short Term Memory"    = c(0,0,0,0,0,-1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+ 
+  "Mood vs. Motor Function"                   = c(0,0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+  "Mood vs. Self Control"                     = c(0,0,0,0,0,0,-1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+  "Mood vs. Short Term Memory"                = c(0,0,0,0,0,0,-1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+ 
+  "Motor Function vs. Self Control"           = c(0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+  "Motor Function vs. Short Term Memory"      = c(0,0,0,0,0,0,0,-1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+  
+  "Self Control vs. Short Term Memory"        = c(0,0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+  
+  #Risk
+  "Risk:Attention vs. Language"                    = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0),
+  "Risk:Attention vs. Long Term Memory"            = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0),
+  "Risk:Attention vs. Mood"                        = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0),
+  "Risk:Attention vs. Motor Function"              = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0),
+  "Risk:Attention vs. Self Control"                = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0),
+  "Risk:Attention vs. Short Term Memory"           = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0),
+  
+  "Risk:Language vs. Long Term Memory"             = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0,0,0),
+  "Risk:Language vs. Mood"                         = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,0,1,0,0,0,0,0,0,0,0,0),
+  "Risk:Language vs. Motor Function"               = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,0,0,1,0,0,0,0,0,0,0,0),
+  "Risk:Language vs. Self Control"                 = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,0,0,0,1,0,0,0,0,0,0,0),
+  "Risk:Language vs. Short Term Memory"            = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,0,0,0,0,1,0,0,0,0,0,0),
+ 
+  "Risk:Long Term Memory vs. Mood"                 = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0,0),
+  "Risk:Long Term Memory vs. Motor Function"       = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,0,1,0,0,0,0,0,0,0,0),
+  "Risk:Long Term Memory vs. Self Control"         = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,0,0,1,0,0,0,0,0,0,0),
+  "Risk:Long Term Memory vs. Short Term Memory"    = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,0,0,0,1,0,0,0,0,0,0),
+ 
+  "Risk:Mood vs. Motor Function"                   = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0),
+  "Risk:Mood vs. Self Control"                     = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,0,1,0,0,0,0,0,0,0),
+  "Risk:Mood vs. Short Term Memory"                = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,0,0,1,0,0,0,0,0,0),
+ 
+  "Risk:Motor Function vs. Self Control"           = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0,0),
+  "Risk:Motor Function vs. Short Term Memory"      = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,0,1,0,0,0,0,0,0),
+  
+  "Risk:Self Control vs. Short Term Memory"        = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0,0),
+  
+  #Gain
+  "Gain:Attention vs. Language"                    = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0),
+  "Gain:Attention vs. Long Term Memory"            = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0),
+  "Gain:Attention vs. Mood"                        = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0),
+  "Gain:Attention vs. Motor Function"              = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0),
+  "Gain:Attention vs. Self Control"                = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0),
+  "Gain:Attention vs. Short Term Memory"           = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1),
+  
+  "Gain:Language vs. Long Term Memory"             = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0),
+  "Gain:Language vs. Mood"                         = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,0,1,0,0,0),
+  "Gain:Language vs. Motor Function"               = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,0,0,1,0,0),
+  "Gain:Language vs. Self Control"                 = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,0,0,0,1,0),
+  "Gain:Language vs. Short Term Memory"            = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,0,0,0,0,1),
+ 
+  "Gain:Long Term Memory vs. Mood"                 = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0,0),
+  "Gain:Long Term Memory vs. Motor Function"       = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,0,1,0,0),
+  "Gain:Long Term Memory vs. Self Control"         = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,0,0,1,0),
+  "Gain:Long Term Memory vs. Short Term Memory"    = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,0,0,0,1),
+ 
+  "Gain:Mood vs. Motor Function"                   = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0),
+  "Gain:Mood vs. Self Control"                     = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,0,1,0),
+  "Gain:Mood vs. Short Term Memory"                = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,0,0,1),
+ 
+  "Gain:Motor Function vs. Self Control"           = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1,0),
+  "Gain:Motor Function vs. Short Term Memory"      = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,0,1),
+  
+  "Gain:Self Control vs. Short Term Memory"        = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1)
+)
+
+library(multcomp)
+
+comps <- glht(m.4, contrasts.martix)
+
+#summary(comps) #Throws a completion error for adjustment
+summary(comps) 
+
+summary(comps, test = adjusted("Shaffer")) 
+#no adjustment for mutiple comparisons.
+```
+
+```{r logisitc mixed models 2}
+#here we demonstrate a larger effect of risk than gain in terms of contribution to the model
+m.base <- glmer(experimental_treatment_selected ~ trial_index + (1 | user_id), 
+                   data = data, family = binomial, 
+                   control=glmerControl(optimizer="bobyqa"))
+
+m.risk <- glmer(experimental_treatment_selected ~ trial_index.c +  risk.c +
+                   (1 | user_id), 
+                   data = data, family = binomial, 
+                   control=glmerControl(optimizer="bobyqa"))
+
+m.gain <- glmer(experimental_treatment_selected ~ trial_index.c + gain.c +  
+                  (1 | user_id), 
+                   data = data, family = binomial, 
+                   control=glmerControl(optimizer="bobyqa"))
+
+m.risk.gain <- glmer(experimental_treatment_selected ~ trial_index.c + risk.c + gain.c + 
+                  (1 | user_id), 
+                   data = data, family = binomial, 
+                   control=glmerControl(optimizer="bobyqa"))
+
+anova(m.base, m.risk)
+anova(m.base, m.gain)
+anova(m.risk, m.risk.gain)
+anova(m.gain, m.risk.gain)
+```
+
+
+```{r}
+data <- read.csv("../data/Cleaned_Pilot/Cleaned_Pilot.09.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE)%>%
+    dplyr::select(user_id, risk, gain, no_effect,ratio, condition, experimental_treatment_selected)
+
+summary(data)
+data <- group_by(data, user_id) %>% 
+   mutate(risk_c= scale(risk, scale = F)) %>% 
+   mutate(gain_c= scale(gain, scale = F))
+
+
+
+M.logistic = by(data, data$user_id, function(x) glm(experimental_treatment_selected ~ risk_c + gain_c, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+
+user_id = names(M.logistic) #creates vector of user_id's 
+n = nrow(data)/75
+
+#Compute odds ratio
+datalist.2 = list()
+for (i in 1:n){
+dat = M.logistic[[i]]$coefficients
+  datalist.2[[i]] = dat
+}
+subjectModels = do.call(rbind, datalist.2)
+
+colnames(subjectModels) <-  c('Intercept', 'Risk_Beta', 'Gain_Beta')
+
+subjectModels <- cbind.data.frame(subjectModels, user_id)
+
+data= merge(data, subjectModels, "user_id")
+
+# Saving on object in RData format
+#save(data, file = paste("../data/Cleaned_Pilot/data2.RData"))
+
+```
+
+#we want to create 3 cats for our ratios
+
+keep in mind that ratio is gain over risk
+```{r ratio models }
+data <- read.csv("../data/Cleaned_Pilot/Cleaned_Pilot.09.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE)%>%
+    dplyr::select(user_id,ratio, condition, experimental_treatment_selected) 
+ 
+
+data.5050 <- filter(data, ratio == 1)
+data.gain <- filter(data, ratio > 1)
+data.risk <- filter(data, ratio < 1)
+
+
+
+data$ratio.type <- rep(0)
+
+data$ratio.type <- ifelse(data$ratio == 1, "gamble.50-50", "disproportional")
+
+
+
+
+M.logistic = by(data, data$user_id, function(x) glm(experimental_treatment_selected ~ ratio, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+
+
+
+
+
+```
+

@@ -1,0 +1,78 @@
+Variable,Question
+X,Not Explicitly Listed
+user_id,Not Explicitly Listed
+rt,Not Explicitly Listed
+key_press,Not Explicitly Listed
+trial_index,Not Explicitly Listed
+time_elapsed,Not Explicitly Listed
+Progress,Not Explicitly Listed
+Duration..in.seconds.,Not Explicitly Listed
+RecordedDate,Not Explicitly Listed
+ResponseId,Not Explicitly Listed
+MFSQ1,"If I saw a mother slapping her child, I would be outraged."
+MFSQ2,It can never be right to kill a human being.
+MFSQ3,Compassion for those who are suffering is the most crucial virtue.
+MFSQ4,The government must first and foremost protect all people from harm.
+MFSQ5,"If a friend wanted to cut in with me on a long line, I would feel uncomfortable because it wouldn’t be fair to those behind me."
+MFSQ6,"Justice, fairness, and equality are the most important requirements for a society."
+MFSQ7,"When the government makes laws, the number one principle should be ensuring that everyone is treated fairly."
+MFSQ8,"When it comes to close friendships and romantic relationships, it is okay for people to seek out only members of their own ethnic or religious group."
+MFSQ9,Loyalty to one’s group is more important than one’s individual concerns.
+MFSQ10,"The government should strive to improve the well-being of people in our nation, even if it sometimes happens at the expense of people in other nations."
+MFSQ11,Men and women each have different roles to play in society.
+MFSQ12,"If I were a soldier and disagreed with my commanding officer’s orders, I would obey anyway because that is my duty."
+MFSQ13,Respect for authority is something all children need to learn.
+MFSQ14,"When the government makes laws, those laws should always respect the traditions and heritage of the country."
+MFSQ15,"People should not do things that are revolting to others, even if no one is harmed."
+MFSQ16,I would call some acts wrong on the grounds that they are unnatural or disgusting.
+MFSQ17,"Chastity is still an important virtue for teenagers today, even if many don’t think it is."
+MFSQ18,The government should try to help people live virtuously and avoid sin.
+MFSQ19,"If I knew that my brother had committed a murder, and the police were looking for him, I would turn him in."
+MFSQ20,"In the fight against terrorism, some people’s rights will have to be violated."
+MFSQ21,What is your political self-identification?
+MFSQ22,Not Explicitly Listed
+MFSQ32,Not Explicitly Listed
+attention_check.1,Not Explicitly Listed
+attention_check.2,Not Explicitly Listed
+BIG5_1,"Is outgoing, sociable."
+BIG5_2,"Is compassionate, has a soft heart."
+BIG5_3,Tends to be disorganized.
+BIG5_4,"Is relaxed, handles stress well."
+sex,What gender do you most identify with?
+age,What is your age?
+race_ethnicity,Which race/ethnicity best describes you?
+education,What is the highest level of education that you have achieved?
+ReligionRaised,What tradition were you raised in?
+ReligionNow,What tradition do you consider yourself now?
+Religiosity,How religious do you consider yourself?
+Spirituality,How spiritual do you consider yourself?
+AttendChurch,How often do you attend church or other religious meetings?
+ReligiousActivity,"How much time do you spend in religious/spiritual activities, such as prayer?"
+meditation,How often do you practice meditation?
+RelationshipStatus,What is your relationship status?
+Income,What is your total yearly income?
+Major,What is your college major?
+YearOfEducation,How many years of total education have you had?
+EmploymentStatus,Current employment status - field and role?
+Political_Party,"Please select which you identify: Democrat, Republican, Independent, Other."
+republican,Please indicate the degree to which 'Republican' describes your political identity.
+democrat,Please indicate the degree to which 'Democrat' describes your political identity.
+independent,Please indicate the degree to which 'Independent' describes your political identity.
+conservative,Please indicate the degree to which 'Conservative' describes your political identity.
+liberal,Please indicate the degree to which 'Liberal' describes your political identity.
+POWER,"Rate the importance of 'POWER' (social power, authority, wealth) as a life-guiding principle."
+SELF.DIRECTION,"Rate the importance of 'SELF-DIRECTION' (creativity, freedom, curiosity, independence, choosing one's own goals) as a life-guiding principle."
+ACHIEVEMENT,"Rate the importance of 'ACHIEVEMENT' (success, capability, ambition, influence on people and events) as a life-guiding principle."
+HEDONISM,"Rate the importance of 'HEDONISM' (gratification of desires, enjoyment in life, self-indulgence) as a life-guiding principle."
+STIMULATION,"Rate the importance of 'STIMULATION' (daring, a varied and challenging life, an exciting life) as a life-guiding principle."
+UNIVERSALISM,"Rate the importance of 'UNIVERSALISM' (broad-mindedness, beauty of nature and arts, social justice, a world at peace, equality, wisdom, unity with nature, environmental protection) as a life-guiding principle."
+BENEVOLENCE,"Rate the importance of 'BENEVOLENCE' (helpfulness, honesty, forgiveness, loyalty, responsibility) as a life-guiding principle."
+TRADITION,"Rate the importance of 'TRADITION' (respect for tradition, humbleness, accepting one's portion in life, devotion, modesty) as a life-guiding principle."
+CONFORMITY,"Rate the importance of 'CONFORMITY' (obedience, honoring parents and elders, self-discipline, politeness) as a life-guiding principle."
+SECURITY,"Rate the importance of 'SECURITY' (national security, family security, social order, cleanliness, reciprocation of favors) as a life-guiding principle."
+MC_Lying,Which of the following statements best characterizes your position on lying?
+MC_Assassin,Which of the following statements best characterizes your position on assassination?
+MC_Torture,Which of the following statements best characterizes your position on torture?
+MC_Murder,Which of the following statements best characterizes your position on murder?
+MC_Stealing,Which of the following statements best characterizes your position on stealing?
+MC_Steril,Which of the following statements best characterizes your position on forced sterilization?

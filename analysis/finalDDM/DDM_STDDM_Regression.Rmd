@@ -1,0 +1,1863 @@
+---
+title: "STDDM Regression"
+output: html_notebook
+---
+
+This script will relate the DDM parameters for each subject with their ideological variables.
+
+# Libraries
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(data.table)
+```
+# Process Data
+
+```{r}
+load("C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM/NeuroethicsPosteriorAndPredictions.RData")
+```
+
+# Compute Correlations between Parameters
+
+```{r}
+library(data.table)
+library(stringr)
+
+# Ensure m1_posterior is a data.table
+setDT(m1_posterior)
+
+# Define the target parameter prefixes
+target_prefixes <- c("time", "b_gain.p", "b_risk.p", "alpha.p", "bias", "theta.p")
+pattern <- paste0("^(", paste(target_prefixes, collapse = "|"), ")\\[\\d+\\]$")
+
+# Keep only relevant columns
+target_cols <- grep(pattern, names(m1_posterior), value = TRUE)
+filtered_dt <- m1_posterior[, ..target_cols]
+
+# Step 1: Compute posterior means for each parameter
+posterior_means <- filtered_dt[, lapply(.SD, mean), .SDcols = target_cols]
+
+# Step 2: Convert to long format to extract participant IDs and metric names
+long <- melt(posterior_means, variable.name = "metric", value.name = "mean_value")
+long[, c("base_metric", "participant_id") := tstrsplit(metric, "\\[|\\]", perl = TRUE)]
+long[, base_metric := gsub("\\.p", "", base_metric)]
+
+# Step 3: Cast to wide format (one row per participant)
+wide <- dcast(long, participant_id ~ base_metric, value.var = "mean_value")
+
+# Step 4: Compute correlation matrix
+cor_matrix <- cor(wide[, -1, with = FALSE], use = "pairwise.complete.obs")
+
+# View result
+print(cor_matrix)
+```
+
+
+## Draw Posteriors for DDM Parameterse
+
+### Group Level
+
+```{r}
+# Define the .mu variable patterns to group by
+mu_variable_groups <- c("time.mu", "b_gain.mu", "b_risk.mu", "alpha.mu", "bias.mu", "theta.mu")
+
+# Extract and compute summaries for .mu variables
+group_level_summaries <- lapply(
+  mu_variable_groups,
+  function(mu_var) {
+    # Extract the values for the .mu variable
+    mu_values <- m1_posterior[[mu_var]]
+    
+    # Compute group-level summaries
+    data.frame(
+      variable_group = mu_var,
+      mean = mean(mu_values),
+      lower_95 = quantile(mu_values, 0.025),
+      upper_95 = quantile(mu_values, 0.975),
+      prob_positive = mean(mu_values > 0),
+      prob_positive = mean(mu_values < 0),
+      non_zero = quantile(mu_values, 0.025) > 0 | quantile(mu_values, 0.975) < 0
+    )
+  }
+)
+
+# Combine results into a single data frame
+group_level_summaries <- do.call(rbind, group_level_summaries)
+
+# Print results
+print(group_level_summaries)
+```
+
+Drawing the posteriors:
+
+```{r}
+# Define the .mu variable patterns to group by
+mu_variable_groups <- c("time.mu", "b_gain.mu", "b_risk.mu", "alpha.mu", "bias.mu", "theta.mu")
+
+# Loop through each .mu variable and save the plot
+for (mu_var in mu_variable_groups) {
+  # Extract the posterior samples for the current variable
+  mu_values <- m1_posterior[[mu_var]]
+  
+  # Calculate the mean of the posterior distribution
+  mean_value <- mean(mu_values)
+  
+  # Create the plot
+  png(
+    filename = paste0("Figures/", mu_var, "_posterior_distribution.png"),
+    width = 8, height = 6, units = "in", res = 300
+  )
+  
+  # Plot the histogram
+  hist(
+    mu_values, 
+    breaks = 50, 
+    probability = TRUE, 
+    main = paste("Posterior Distribution for", mu_var), 
+    xlab = "Value", 
+    ylab = "Density", 
+    col = "#ADD8E6", 
+    border = "#636363"
+  )
+  
+  # Overlay the density curve
+  lines(density(mu_values), col = "black", lwd = 2)
+  
+  # Add a dotted line at the mean
+  abline(v = mean_value, col = "red", lty = 2, lwd = 2)
+  
+  # Add a legend
+  legend(
+    "topright",
+    legend = paste("Mean =", round(mean_value, 3)),
+    col = "red",
+    lty = 2,
+    lwd = 2,
+    bty = "n"
+  )
+  
+  dev.off()
+}
+```
+
+
+### Individualized
+
+```{r}
+library(furrr) # For parallel processing
+plan(multisession) # Use multiple cores for parallel execution
+
+# Define the variable patterns to group by
+variable_groups <- c("time\\[", "b_gain\\.p\\[", "b_risk\\.p\\[", "alpha\\.p\\[", "bias\\[", "theta\\.p\\[")
+
+col_names <- c("Time", "Gain Weight", "Risk Weight", "Alpha", "Bias", "Theta")
+
+# Function to calculate individual summaries for a given variable group
+compute_individual_summaries <- function(group_pattern) {
+  # Find matching columns
+  matching_columns <- grep(group_pattern, names(m1_posterior), value = TRUE)
+  
+  # Parallelized computation for each participant
+  future_map_dfr(
+    matching_columns,
+    ~ {
+      participant_values <- m1_posterior[[.x]]
+      data.frame(
+        variable_group = group_pattern,
+        participant = .x,
+        mean = mean(participant_values),
+        lower_95 = quantile(participant_values, 0.025),
+        upper_95 = quantile(participant_values, 0.975),
+        prob_positive = mean(participant_values > 0),
+        non_zero = quantile(participant_values, 0.025) > 0 | quantile(participant_values, 0.975) < 0
+      )
+    },
+    .progress = TRUE # Show progress bar
+  )
+}
+
+# Apply the function to all variable groups
+individual_summaries <- future_map_dfr(variable_groups, compute_individual_summaries)
+
+# Print final results
+print(individual_summaries)
+
+```
+
+We will draw the individualized posteriors and save them
+
+```{r}
+# Load necessary library
+library(ggplot2)
+
+variable_sub <- c("time", "gain", "risk", "alpha", "bias", "theta")
+
+# Convert idxP in unique_idxP_table to character for matching
+valid_idxP <- unique_idxP_table$idxP %>% as.character()
+
+# Loop through each group in variable_groups
+for (i in seq_along(variable_groups)) {
+  # Define the current pattern and column name
+  pattern <- variable_sub[i]
+  col_name <- col_names[i]
+  
+ # Extract the numeric part from the variable_group column
+  individual_summaries <- individual_summaries %>%
+    mutate(idxP_extracted = str_extract(participant, "(?<=\\[)\\d+(?=\\])")) 
+  
+  # Filter rows where idxP is in the valid_idxP list
+  filtered_data <- individual_summaries %>%
+    filter(str_detect(variable_group, pattern) & idxP_extracted %in% valid_idxP)
+  
+  # browser()
+  
+    # Check if the current group is "time"
+  if (pattern == "time") {
+    # Special styling for the "time" histogram
+    # browser()
+    plot <- ggplot(filtered_data, aes(x = mean)) +
+      geom_histogram(
+        aes(y = ..density.., fill = ..x.. > 0),
+        bins = 20,
+        color = "black",
+        alpha = 0.7,
+        boundary = 0.0,  # Align bins around 0.0
+      ) +
+      scale_fill_manual(
+        values = c("#4272c4", "#e97d2d"),
+        labels = c("Benefits First", "Risks First"),
+        name = "Latency"
+      ) +
+      geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+      labs(
+        title = paste(col_name, "Posterior Distribution"),
+        x = "Mean",
+        y = "Density"
+      ) +
+      scale_y_continuous(expand = c(0, 0)) +
+      scale_x_continuous(expand = c(0, 0)) +
+      theme_minimal() +
+  theme(
+      plot.title = element_text(size = 28, face = "bold", hjust = 0.5),  # Increase title font size
+      axis.title = element_text(size = 24, face = "bold"),  # Increase axis label font size
+      axis.text = element_text(size = 18),   # Increase axis text size
+      legend.text = element_text(size = 18), # Increase legend text size
+      legend.title = element_text(size = 24, face = "bold"), # Increase legend title size
+      panel.background = element_rect(fill = "white", color = "white"),  # White panel background
+      plot.background = element_rect(fill = "white", color = "white"),   # White plot background
+      panel.grid.major = element_line(color = "grey80"),   # Optional: Adjust grid lines for better visibility
+      panel.grid.minor = element_line(color = "grey90"),    # Optional: Lighter minor grid lines
+      axis.title.y = element_text(margin = margin(r = 20), face = "bold"),
+      legend.position = "right",
+      axis.line = element_line(color = "black", linewidth = 0.5), # Add solid black lines for x and y-axis
+      legend.spacing.y = unit(2, "cm"),  # Increase spacing between legend elements
+      axis.ticks = element_line(color = "black", size = 0.5),  # Subtle black tick marks
+      axis.ticks.length = unit(0.2, "cm")  # Length of the tick marks
+  ) 
+  } else {
+    # Create the histogram of the mean column
+    plot <- ggplot(filtered_data, aes(x = mean)) +
+      geom_histogram(bins = 20, color = "black", fill = "blue", alpha = 0.5) +
+      labs(
+        title = paste(col_name, "Posterior Distribution"),
+        x = "Mean",
+        y = "Frequency"
+      ) +
+      scale_y_continuous(expand = c(0, 0)) +  # Remove vertical gaps
+      theme_minimal() +
+      theme(
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA),
+        panel.grid.major = element_blank(), #element_line(color = "gray85"),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18, face = "bold"),
+        plot.title = element_text(size = 24, face = "bold", hjust = 0.5),
+      )
+  }
+  
+  # Save the plot to a file
+  # file_name <- paste0("Figures/", gsub(" ", "_", col_name), "_posterior_distribution.png")
+  # ggsave(file_name, plot = plot, dpi = 300, width = 8, height = 6)
+}
+```
+
+### Compare the risk and benefit weighing of each variable
+
+```{r}
+library(dplyr)
+library(stringr)
+library(ggplot2)
+
+# Extract numerical part from participant column
+individual_summaries <- individual_summaries %>%
+  mutate(idxP_extracted = str_extract(participant, "(?<=\\[)\\d+(?=\\])")) 
+
+# Convert extracted idxP to numeric for matching
+individual_summaries$idxP_extracted <- as.numeric(individual_summaries$idxP_extracted)
+
+# Filter the relevant rows
+filtered_data <- individual_summaries %>%
+  filter(idxP_extracted %in% unique_idxP_table$idxP) %>%
+  select(participant, mean, idxP_extracted)
+
+# Create separate dataframes for gain and risk
+gain_data <- filtered_data %>%
+  filter(str_detect(participant, "b_gain")) %>%
+  rename(Gain = mean)
+
+risk_data <- filtered_data %>%
+  filter(str_detect(participant, "b_risk")) %>%
+  rename(Risk = mean)
+
+# Merge gain and risk data on idxP_extracted
+plot_data <- full_join(gain_data, risk_data, by = "idxP_extracted") %>%
+  mutate(
+    Gain = abs(Gain),
+    Risk = abs(Risk),
+    Color = ifelse(Gain > Risk, "Above", "Below")
+  )
+
+# Plot using ggplot2
+library(ggplot2)
+
+plot <- ggplot(plot_data, aes(x = Risk, y = Gain, color = Color)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, linetype = "dotted", color = "black") +
+  scale_color_manual(values = c("Above" = "#4272c4", "Below" = "#e97d2d")) +
+  labs(
+    x = "Risk Weight",
+    y = "Benefit Weight",
+    title = "Risk vs Benefit Weighing\nAcross Participants",
+    color = "Position"
+  ) +
+  theme_classic() + # Use a classic theme with a white background
+  theme(
+    plot.title = element_text(size = 28, face = "bold", hjust = 0.5),  # Increase title font size
+    axis.title = element_text(size = 24, face = "bold"),  # Increase axis label font size
+    axis.text = element_text(size = 18),   # Increase axis text size
+    legend.text = element_text(size = 18), # Increase legend text size
+    legend.title = element_text(size = 24, face = "bold"), # Increase legend title size
+    panel.background = element_rect(fill = "white", color = "white"),  # White panel background
+    plot.background = element_rect(fill = "white", color = "white"),   # White plot background
+    panel.grid.major = element_line(color = "grey80"),   # Optional: Adjust grid lines for better visibility
+    panel.grid.minor = element_line(color = "grey90"),    # Optional: Lighter minor grid lines
+    axis.title.y = element_text(margin = margin(r = 20), face = "bold"),
+    legend.position = "none",
+  ) +
+  xlim(0, 4) + # Set x-axis limits
+  ylim(0, 4) +   # Set y-axis limits
+  coord_fixed(ratio = 1)  # Ensures 1:1 ratio
+
+# Save the plot at 300 DPI
+ggsave("Figures/risk_vs_gain_colored_plot.png", plot = plot, dpi = 300, width = 8, height = 6)
+```
+
+
+
+
+## Clean DDM Data
+
+```{r}
+# Extract DDM Metrics
+library(dplyr)
+library(stringr)
+
+# Step 1: Identify columns with square brackets in m1_posterior
+# Extract columns that match the pattern with ".p[XX]" or just "[XX]"
+selected_columns <- m1_posterior %>%
+  select(matches("\\[\\d+\\]$"))
+
+# Step 2: Calculate the averages for each column
+averages <- selected_columns %>%
+  summarise(across(everything(), mean, na.rm = TRUE))
+
+# Step 3: Extract both metric_name and participant_id, handling both ".p[XX]" and "[XX]"
+column_info <- tibble(
+  full_colname = colnames(averages),
+  participant_id = str_extract(colnames(averages), "(?<=\\[)\\d+(?=\\])"),  # Extract participant ID if present in square brackets
+  metric_name = str_replace(colnames(averages), "\\.?p?\\[\\d+\\]$", "")  # Remove either ".p[XX]" or "[XX]"
+)
+
+# Pivot the data into wide format where each metric_name becomes a separate column
+averages_wide <- averages %>%
+  pivot_longer(cols = everything(), names_to = "full_colname", values_to = "average") %>%
+  left_join(column_info, by = "full_colname") %>%
+  mutate(participant_id = as.numeric(participant_id)) %>%
+  select(participant_id, metric_name, average) %>%
+  pivot_wider(names_from = metric_name, values_from = average)  # Pivot into wide format
+```
+
+## Extract Demographic Data with Susbcores
+
+We need to pull the user_id from risk_data since we only have idxP
+
+```{r}
+# Load and prepare data
+behavior_path <- "C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/data/FINAL_RT_EXCLUDED_DATA_20241014.RData"
+load(behavior_path)
+risk_data <- risk_data %>%
+  mutate(
+    idxP = as.numeric(as.factor(user_id)) # Create numeric subject index
+  ) 
+
+# Load final participant list
+participant_list_path <- "C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM/FINAL_PARTICIPANT_LIST.RData"
+load(participant_list_path)
+```
+
+We will be pulling in the data from the raw.csv
+
+```{r}
+raw_behavior_path <- "C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/data/raw_mturk_data/raw.csv"
+raw_data <- read.csv(raw_behavior_path)
+
+raw_data <- raw_data %>%
+  filter(user_id %in% unique_idxP_table$user_id)
+
+# Collapse across user_id and take the first value for each column
+collapsed_data <- raw_data %>%
+  group_by(user_id) %>%
+  summarise(across(everything(), ~ first(.)))
+
+risk_data_simplified <- risk_data %>%
+  group_by(user_id) %>%
+  slice(1) %>%
+  ungroup()
+
+averages_wide <- averages_wide %>%
+  left_join(risk_data_simplified %>% select(idxP, user_id), by = c("participant_id" = "idxP"))
+
+```
+
+## Combine Both Tables
+
+```{r}
+final_table <- left_join(collapsed_data, averages_wide, by = c("user_id" = "user_id"))
+final_table <- as.data.table(final_table)
+
+# Specify the columns to convert
+columns_to_factor <- c(
+  "sex", "education", "ReligionRaised", "ReligionNow", "AttendChurch", 
+  "ReligiousActivity", "meditation", "RelationshipStatus", 
+  "Major", "EmploymentStatus", "Political_Party", "Optimize", "HumanMind"
+)
+
+# Subset `risk_data` to select only the `user_id` and the desired columns
+risk_data_subset <- risk_data_simplified[, c("user_id", columns_to_factor)]
+
+# Drop the original columns from `final_table` that are redundant
+final_table <- final_table %>% select(-all_of(columns_to_factor))
+
+# Merge `final_table` with the subsetted `risk_data` by `user_id`
+final_table <- merge(final_table, risk_data_subset, by = "user_id")
+
+# Clean up YearOfEducation
+final_table[YearOfEducation == "two", YearOfEducation := "2"]
+final_table[, YearOfEducation := gsub("[^0-9.]", "", YearOfEducation)]
+final_table[, YearOfEducation := as.numeric(YearOfEducation)]
+
+# Convert Berlin Scores into Correct / Incorrect
+final_table$Berlin1 <- factor(ifelse(final_table$Berlin1 == 25, 1, 0))
+final_table$Berlin2 <- factor(ifelse(final_table$Berlin2 == 30, 1, 0))
+final_table$Berlin3 <- factor(ifelse(final_table$Berlin3 == 20, 1, 0))
+final_table$Berlin4 <- factor(ifelse(final_table$Berlin4 == 50, 1, 0))
+
+# Convert MC Answers into Factors
+final_table$MC_Lying <- factor(final_table$MC_Lying)
+final_table$MC_Assassin <- factor(final_table$MC_Assassin)
+final_table$MC_Torture <- factor(final_table$MC_Torture)
+final_table$MC_Murder <- factor(final_table$MC_Murder)
+final_table$MC_Stealing <- factor(final_table$MC_Stealing)
+final_table$MC_Steril <- factor(final_table$MC_Steril)
+
+```
+
+
+# Ridge Regression
+
+```{r}
+compute_feature_importance <- function(data, response, predictors, 
+         n_subsets = 100, subset_fraction = 1, feature_fraction = 0.8, 
+         lambda = 0.1) {
+  # List to store the importance scores for each subset
+  feature_importance_list <- list()
+
+  independent_formula <- as.formula(paste("~", paste(predictors, collapse = " + ")))
+  
+  # Define the full design matrix to set column names
+  full_matrix <- model.matrix(independent_formula, data = data)[, -1]
+  all_columns <- colnames(full_matrix)
+  
+  # Compute feature frequencies
+  feature_frequencies <- colMeans(full_matrix != 0)  # Proportion of non-zero values per feature
+  
+  for (i in 1:n_subsets) {
+    # Randomly sample a subset of the data
+    subset_data <- data %>%
+      sample_frac(subset_fraction)
+    
+    # Prepare the design matrix for independent variables using the formula
+    data_matrix <- model.matrix(independent_formula, data = subset_data)[, -1]  # Drop intercept column
+    
+    # Randomly sample a subset of the columns (features)
+    selected_features <- sample(all_columns, size = floor(feature_fraction * length(all_columns)))
+    data_matrix <- data_matrix[, selected_features, drop = FALSE]
+    
+    # Align with full column set, filling missing columns with 0
+    missing_cols <- setdiff(all_columns, colnames(data_matrix))
+    for (col in missing_cols) {
+      data_matrix <- cbind(data_matrix, `col` = 0)
+      colnames(data_matrix)[ncol(data_matrix)] <- col  # Assign correct column name
+    }
+    data_matrix <- data_matrix[, all_columns, drop = FALSE]  # Reorder to match full_matrix column order
+    
+    # Initialize feature importance matrix once we know the number of columns in data_matrix
+    if (i == 1) {
+      feature_importance <- matrix(NA, nrow = n_subsets, ncol = length(all_columns))
+      colnames(feature_importance) <- all_columns
+    }
+    
+    # Extract the response variable
+    y <- subset_data[[response]]
+    
+    # Fit ridge regression (alpha = 0 for ridge)
+    ridge_model <- glmnet(data_matrix, y, alpha = 0, lambda = lambda, standardize = TRUE)
+    # Store absolute values of coefficients for the current subset
+    coef_vector <- abs(as.vector(coef(ridge_model)[-1]))  # Drop intercept and convert to vector
+    # coef_vector <- (as.vector(coef(ridge_model)[-1]))
+    # Store the coefficients in the feature importance matrix
+    feature_importance[i, ] <- coef_vector
+  }
+  
+  # browser()
+  
+  # Compute the average importance score across subsets
+  importance_scores <- colMeans(feature_importance, na.rm = TRUE)
+  importance_se <- apply(feature_importance, 2, function(x) sd(x, na.rm = TRUE) / sqrt(n_subsets))
+  
+   # Adjust importance scores by feature frequency
+  adjusted_importance_scores <- importance_scores * feature_frequencies
+  
+  # Return a sorted dataframe with importance scores and standard errors
+  importance_df <- data.frame(
+    Feature = colnames(feature_importance),
+    Importance = adjusted_importance_scores,
+    StdError = importance_se
+  )
+  importance_df <- importance_df %>% arrange(desc(Importance))
+  
+  return(importance_df)
+}
+
+```
+
+I will save these feature importance and coefficient results in the file, ridge_regression.RData
+
+```{r}
+# Load necessary libraries
+library(data.table)
+library(glmnet)
+library(ggplot2)
+
+set.seed(1234)
+
+column_names = colnames(final_table)
+
+# Remove unwanted columns (explicitly removing 'X')
+predictors <- column_names[
+  !grepl("^(participant_id|user_id|rt|key_press|trial_index|time_elapsed|condition|condition_per_trial|total_trials|treatment_display|risk|gain|no_effect|experimental_treatment_selected|Progress|Duration..in.seconds.|RecordedDate|ResponseId|attention_check|Q1802|Income|Major|EmploymentStatus)", column_names) &
+  column_names != "X" # Explicitly exclude the 'X' column
+]
+
+final_table <- final_table[complete.cases(final_table[, ..predictors])]
+# final_table[, condition := relevel(factor(condition), ref = "Motor Function")]
+
+# Define dependent and independent variables
+dependent_vars <- c("time", "b_gain", "b_risk", "alpha", "theta", "bias")
+predictors = setdiff(predictors, dependent_vars)
+
+independent_formula <- as.formula(paste("~", paste(predictors, collapse = " + ")))
+
+# Prepare the design matrix for independent variables using the formula
+data_matrix <- model.matrix(independent_formula, data = final_table)[, -1]  # Drop intercept column
+
+# Standardize the response and predictors
+coef_list <- list()
+# List to store the importance data frames for each response variable
+importance_results <- list()
+
+for (dep_var in dependent_vars) {
+  print(dep_var)
+  # Standardize the dependent variable
+  y <- scale(final_table[[dep_var]])
+
+  # Perform cross-validated ridge regression
+  cv_fit <- cv.glmnet(data_matrix, y, alpha = 0)  # Ridge regression (alpha = 0)
+  best_lambda <- cv_fit$lambda.min
+  ridge_model <- glmnet(data_matrix, y, alpha = 0, lambda = best_lambda)
+
+  # Make predictions
+  predictions <- predict(ridge_model, newx = data_matrix)
+  
+  # Calculate R-squared
+  ss_total <- sum((y - mean(y))^2)  # Total sum of squares
+  ss_residual <- sum((y - predictions)^2)  # Residual sum of squares
+  r_squared <- 1 - (ss_residual / ss_total)
+  
+  # Convert R-squared to percentage
+  percent_variance_explained <- r_squared * 100
+  percent_variance_explained
+  
+  message <- sprintf("The model explains %.2f%% of the variance in the data.", percent_variance_explained)
+  print(message)
+  
+  importance_df <- compute_feature_importance(data = final_table,
+  response = dep_var,
+  predictors = predictors,
+  n_subsets = 100,
+  lambda = best_lambda)
+  
+  importance_results[[dep_var]] <- importance_df
+
+  # Extract coefficients, convert to data.table, and store standardized beta weights
+  coefs <- as.data.table(as.matrix(coef(ridge_model)))
+  setnames(coefs, "s0", dep_var)
+  coefs[, Predictor := rownames(coef(ridge_model))]
+  
+  # Remove the intercept row
+  coefs <- coefs[Predictor != "(Intercept)"]
+  
+  # Append to list
+  coef_list[[dep_var]] <- coefs
+}
+
+# Combine all coefficients into one table
+coefficients_table <- Reduce(function(dt1, dt2) merge(dt1, dt2, by = "Predictor", all = TRUE), coef_list)
+
+# Melt the data.table for easier plotting
+melted_coefs <- melt(coefficients_table, id.vars = "Predictor", variable.name = "Dependent_Variable", value.name = "Beta_Weight")
+```
+
+Plot Results
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+# Example plotting function for one dependent variable
+plot_importance <- function(importance_df, dependent_var_name) {
+  # Order by absolute importance to get top 50 values
+  plot_data <- importance_df %>%
+    mutate(AbsImportance = abs(Importance)) %>%
+    arrange(desc(AbsImportance)) %>%
+    head(50) %>%  # Keep only the top 50 by absolute importance
+    arrange(Importance) %>%  # Reorder by actual importance for plotting
+    select(-AbsImportance) %>%
+    mutate(Type = ifelse(Importance >= 0, "Positive", "Negative")) %>%
+    mutate(Feature = factor(Feature, levels = Feature)) # Preserve order for plotting
+  
+  # Create the plot
+  ggplot(plot_data, aes(x = Importance, y = Feature)) +
+    geom_point(size = 3, aes(color = Type)) +  # Dot for the mean
+    geom_errorbarh(aes(xmin = Importance - StdError, xmax = Importance + StdError),
+                   height = 0.2, color = "black") +  # Horizontal error bars
+    scale_color_manual(values = c("Negative" = "darkred", "Positive" = "darkblue")) +
+    theme_minimal() +
+    labs(
+      title = paste("Top 50 Feature Importance for", dependent_var_name),
+      x = "Adjusted Feature Importance",
+      y = "Feature"
+    ) +
+    theme(
+      legend.position = "none",
+      panel.background = element_rect(fill = "white", color = NA), # White background
+      plot.background = element_rect(fill = "white", color = NA), # White background
+      plot.title = element_text(size = 28, face = "bold", hjust = 0.5), # Centered and larger title
+      axis.title.x = element_text(size = 24),   # Larger x-axis label
+      axis.title.y = element_text(size = 24),   # Larger y-axis label
+      axis.text.y = element_text(size = 16),    # Slightly larger y-axis text
+      axis.text.x = element_text(size = 16),    # Slightly larger x-axis text
+    )
+}
+
+# Save each plot to a PNG file
+dependent_vars <- names(importance_results)
+for (dependent_var_name in dependent_vars) {
+  importance_df <- importance_results[[dependent_var_name]]
+  plot <- plot_importance(importance_df, dependent_var_name)
+  
+  # Save the plot
+  ggsave(
+    filename = paste0('Figures/FeatureImportance_Final_', dependent_var_name, ".png"),
+    plot = plot,
+    width = 16, height = 12, dpi = 300
+  )
+}
+```
+
+# Valence Permutation Test
+
+1.6.2025: This code will be run to do a permutation test on each DDM parameter to determine if there are significant differences in the valence compared to a null distribution.
+
+## Read the results
+```{r}
+load("C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM/RidgeResults.RData")
+question_text = read.csv("C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/data/text_key.csv")
+```
+
+## Perform the join with question text
+
+```{r}
+# Define the column names you want to process
+columns_to_process <- c("time", "b_gain", "b_risk", "alpha", "theta", "bias")
+
+# Create a list to store the results
+results_list <- list()
+
+# Loop through each column name and process it
+for (col_name in columns_to_process) {
+  # Process each column
+  importance_result <- importance_results[[col_name]] %>%
+    rowwise() %>%
+    mutate(
+      colname = ifelse(
+        Feature %in% question_text$colname,
+        Feature,
+        question_text$colname[which(startsWith(Feature, question_text$colname))[1]]
+      ),
+      colname = ifelse(is.na(colname), "", colname)
+    ) %>%
+    ungroup() %>%
+    # Perform the join
+    left_join(question_text, by = c("colname" = "colname")) %>%
+    # Replace unmatched features with an empty string
+    mutate(text = ifelse(is.na(text), "", text))
+  
+  # Store the result in the list
+  results_list[[col_name]] <- importance_result
+}
+```
+
+# Permutation Test (NEW)
+
+We will use the same clusters that were plotted before but then use a permutation test to identify if any of them have higher importance values than the other.
+
+## Get Cluster Labels
+
+```{r}
+library(dplyr)
+category_colors <- c(
+  "BIG5" = "#808080",
+  "Moral Foundations (MFQ)" = "#009E73",
+  "Religious & Spiritual" = "#F0E442", 
+  "Risk Taking (GRiPS)" = "#d62728",
+  "Interpersonal Reactivity" = "#88CCEE",
+  "Values (Schwartz)" = "#AA4499",
+  "Political" = "#117733",
+  "Demographics" = "#882255",
+  "Moral Commitments" = "#bcbd22",
+  "Numeracy" = "#661100",
+  "Optimize" = "#332288",
+  "Human Mind" = "#D55E00"
+  # "Other" = "#7f7f7f"
+)
+
+# Update category mapping to separate BIG5 dimensions based on scoring key
+category_mapping <- list(
+  "BIG5" = "^BIG5",
+  
+  # Rest of categories remain the same
+  "Moral Foundations (MFQ)" = "^MFSQ",
+  "Religious & Spiritual" = c("^Religion", "^AttendChurch", "Spirituality", "Religiosity", "^ReligiousActivity", "meditation"),
+  "Risk Taking (GRiPS)" = "^GRiPS_",
+  "Interpersonal Reactivity" = c("^PT", "^EC", "^PD", "^FS"),
+  "Values (Schwartz)" = c("TRADITION", "SELF.DIRECTION", "SECURITY", "CONFORMITY", "BENEVOLENCE",
+                          "POWER", "ACHIEVEMENT", "STIMULATION", "HEDONISM", "UNIVERSALISM"),
+  "Political" = c("^Political_Party", "liberal", "conservative", "republican", "democrat", "independent"),
+  "Demographics" = c("^education", "^RelationshipStatus", "age", "^sex", "race_ethnicity", "YearOfEducation"),
+  "Moral Commitments" = "^MC_",
+  "Numeracy" = c("^Berlin", "^SNS"),
+  "Optimize" = "Optimize",
+  "Human Mind" = "HumanMind"
+)
+
+# Define parameter names with expressions for rendering
+measure_names <- c(
+  "time" = expression(s[time]),
+  "b_gain" = expression(nu[beta[gain]]),
+  "b_risk" = expression(nu[beta[risk]]),
+  "alpha" = expression(alpha),
+  "theta" = expression(tau),
+  "bias" = expression(z)
+)
+
+# Function to map to the categories we hard-coded above
+get_category <- function(feature_name) {
+  for(cat_name in names(category_mapping)) {
+    patterns <- category_mapping[[cat_name]]
+    if(any(sapply(patterns, function(p) grepl(p, feature_name)))) {
+      return(cat_name)
+    }
+  }
+  return("Other")
+}
+```
+## Get Old Cluster Labels
+
+```{r}
+library(dplyr)
+# Update category mapping to separate BIG5 dimensions based on scoring key
+category_mapping <- list(
+  "BIG5 - Extraversion" = c("BIG5_1", "BIG5_6", "BIG5_11", "BIG5_16", "BIG5_21", "BIG5_26", "BIG5_31", "BIG5_36", "BIG5_41", "BIG5_46", "BIG5_51", "BIG5_56"),
+  "BIG5 - Agreeableness" = c("BIG5_2", "BIG5_7", "BIG5_12", "BIG5_17", "BIG5_22", "BIG5_27", "BIG5_32", "BIG5_37", "BIG5_42", "BIG5_47", "BIG5_52", "BIG5_57"),
+  "BIG5 - Conscientiousness" = c("BIG5_3", "BIG5_8", "BIG5_13", "BIG5_18", "BIG5_23", "BIG5_28", "BIG5_33", "BIG5_38", "BIG5_43", "BIG5_48", "BIG5_53", "BIG5_58"),
+  "BIG5 - Negative Emotionality" = c("BIG5_4", "BIG5_9", "BIG5_14", "BIG5_19", "BIG5_24", "BIG5_29", "BIG5_34", "BIG5_39", "BIG5_44", "BIG5_49", "BIG5_54", "BIG5_59"),
+  "BIG5 - Open-Mindedness" = c("BIG5_5", "BIG5_10", "BIG5_15", "BIG5_20", "BIG5_25", "BIG5_30", "BIG5_35", "BIG5_40", "BIG5_45", "BIG5_50", "BIG5_55", "BIG5_60"),
+  
+  # Rest of categories remain the same
+  "Moral Foundations (MFQ)" = "^MFSQ",
+  "Religious & Spiritual" = c("^Religion", "^AttendChurch", "Spirituality", "Religiosity", "^ReligiousActivity", "meditation"),
+  "Risk Taking (GRiPS)" = "^GRiPS_",
+  "Subjective Numeracy" = "^SNS",
+  "Interpersonal Reactivity" = c("^PT", "^EC", "^PD", "^FS"),
+  "Values (Schwartz)" = c("TRADITION", "SELF.DIRECTION", "SECURITY", "CONFORMITY", "BENEVOLENCE",
+                          "POWER", "ACHIEVEMENT", "STIMULATION", "HEDONISM", "UNIVERSALISM"),
+  "Political" = c("^Political_Party", "liberal", "conservative", "republican", "democrat", "independent"),
+  "Demographics" = c("^education", "^RelationshipStatus", "age", "^sex", "race_ethnicity", "YearOfEducation"),
+  "Moral Commitments" = "^MC_",
+  "Numeracy & Cognition" = c("^Berlin", "Optimize", "HumanMind")
+)
+
+# Function to map to the categories we hard-coded above
+get_category <- function(feature_name) {
+  for(cat_name in names(category_mapping)) {
+    patterns <- category_mapping[[cat_name]]
+    if(any(sapply(patterns, function(p) grepl(p, feature_name)))) {
+      return(cat_name)
+    }
+  }
+  return("Other")
+}
+
+measures <- c("time", "b_gain", "b_risk", "alpha", "theta", "bias")
+cats <- c("BIG5 - Extraversion", "BIG5 - Agreeableness", "BIG5 - Conscientiousness", 
+          "BIG5 - Negative Emotionality", "BIG5 - Open-Mindedness")
+
+# Create a list where each measure will store category-wise means
+category_means <- lapply(measures, function(measure) {
+  data_plt <- importance_results[[measure]] %>%
+    mutate(
+      Category = sapply(Feature, get_category),
+      StdError = StdError,
+      Importance = Importance
+    ) 
+  
+  # Compute mean importance per category and store it in a named list
+  category_means_list <- sapply(cats, function(cat) {
+    mean(data_plt[data_plt$Category == cat, ]$Importance, na.rm = TRUE)
+  }, simplify = FALSE)  # Keep output as named list
+
+  return(category_means_list)
+})
+
+# Attach measure names
+names(category_means) <- measures
+
+# Convert to a data frame for better readability
+category_means_df <- do.call(rbind, lapply(names(category_means), function(measure) {
+  data.frame(
+    Measure = measure,
+    Category = names(category_means[[measure]]),
+    Mean_Importance = unlist(category_means[[measure]])
+  )
+}))
+
+# **Sort the data frame**: First by Measure, then by Mean_Importance (descending)
+sorted_category_means_df <- category_means_df %>%
+  arrange(Measure, desc(Mean_Importance))
+
+# Print or return the structured output
+print(category_means_df)
+```
+## Get Factorized Cluster Labels
+```{r}
+library(dplyr)
+
+# Update category mapping to separate BIG5 dimensions based on scoring key
+category_mapping <- list(
+  "BIG5 - Extraversion" = c("BIG5_1", "BIG5_6", "BIG5_11", "BIG5_16", "BIG5_21", "BIG5_26", "BIG5_31", "BIG5_36", "BIG5_41", "BIG5_46", "BIG5_51", "BIG5_56"),
+  "BIG5 - Agreeableness" = c("BIG5_2", "BIG5_7", "BIG5_12", "BIG5_17", "BIG5_22", "BIG5_27", "BIG5_32", "BIG5_37", "BIG5_42", "BIG5_47", "BIG5_52", "BIG5_57"),
+  "BIG5 - Conscientiousness" = c("BIG5_3", "BIG5_8", "BIG5_13", "BIG5_18", "BIG5_23", "BIG5_28", "BIG5_33", "BIG5_38", "BIG5_43", "BIG5_48", "BIG5_53", "BIG5_58"),
+  "BIG5 - Negative Emotionality" = c("BIG5_4", "BIG5_9", "BIG5_14", "BIG5_19", "BIG5_24", "BIG5_29", "BIG5_34", "BIG5_39", "BIG5_44", "BIG5_49", "BIG5_54", "BIG5_59"),
+  "BIG5 - Open-Mindedness" = c("BIG5_5", "BIG5_10", "BIG5_15", "BIG5_20", "BIG5_25", "BIG5_30", "BIG5_35", "BIG5_40", "BIG5_45", "BIG5_50", "BIG5_55", "BIG5_60"),
+  "Moral Foundations - Harm" = c("MFSQ1", "MFSQ7", "MFSQ12", "MFSQ17", "MFSQ23", "MFSQ28"),
+  "Moral Foundations - Fairness" = c("MFSQ2", "MFSQ8", "MFSQ13", "MFSQ18", "MFSQ24", "MFSQ29"),
+  "Moral Foundations - Loyalty" = c("MFSQ3", "MFSQ9", "MFSQ14", "MFSQ19", "MFSQ25", "MFSQ30"),
+  "Moral Foundations - Authority" = c("MFSQ4", "MFSQ10", "MFSQ15", "MFSQ20", "MFSQ26", "MFSQ31"),
+  "Moral Foundations - Purity" = c("MFSQ5", "MFSQ11", "MFSQ16", "MFSQ21", "MFSQ27", "MFSQ32"),
+  "Moral Foundations - Unclassified" = c("MFSQ6", "MFSQ22"),
+  "Religious & Spiritual" = c("^Religion", "^AttendChurch", "Spirituality", "Religiosity", "^ReligiousActivity", "meditation"),
+  "Risk Taking (GRiPS)" = "^GRiPS_",
+  "Interpersonal Reactivity - Perspective Taking" = "^PT", 
+  "Interpersonal Reactivity - Empathic Concern" = "^EC", 
+  "Interpersonal Reactivity - Personal Distress" = "^PD",
+  "Interpersonal Reactivity - Fantasy" = "^FS",
+  "Values (Schwartz) - Tradition" = "TRADITION", 
+  "Values (Schwartz) - Self Direction" = "SELF.DIRECTION", 
+  "Values (Schwartz) - Security" = "SECURITY", 
+  "Values (Schwartz) - Conformity" = "CONFORMITY", 
+  "Values (Schwartz) - Benevolence" = "BENEVOLENCE",
+  "Values (Schwartz) - Power" = "POWER", 
+  "Values (Schwartz) - Achievement" = "ACHIEVEMENT", 
+  "Values (Schwartz) - Stimulation" = "STIMULATION", 
+  "Values (Schwartz) - Hedonism" = "HEDONISM", 
+  "Values (Schwartz) - Universalism" = "UNIVERSALISM",
+  "Political" = c("^Political_Party", "liberal", "conservative", "republican", "democrat", "independent"),
+  "Demographics_RelationshipStatus" = "^RelationshipStatus",
+  "Demographics_age" = "age",
+  "Demographics_sex" = "^sex",
+  "Demographics_race_ethnicity" = "race_ethnicity",
+  "Demographics_education" = c("^education", "YearofEducation"),
+  "Moral Commitments - Lying" = "MC_Lying",
+  "Moral Commitments - Assassin" = "MC_Assassin",
+  "Moral Commitments - Torture" = "MC_Torture",
+  "Moral Commitments - Murder" = "MC_Murder",
+  "Moral Commitments - Stealing" = "MC_Stealing",
+  "Moral Commitments - Steril" = "MC_Steril",
+  "Berlin Numeracy" = "^Berlin",
+  "Subjective Numeracy" = "^SNS",
+  "Optimize" = "Optimize",
+  "Human Mind" = "HumanMind"
+)
+
+# Define parameter names with expressions for rendering
+measure_names <- c(
+  "time" = expression(s[time]),
+  "b_gain" = expression(nu[beta[gain]]),
+  "b_risk" = expression(nu[beta[risk]]),
+  "alpha" = expression(alpha),
+  "theta" = expression(tau),
+  "bias" = expression(z)
+)
+
+# Function to map to the categories we hard-coded above
+get_category <- function(feature_name) {
+  for(cat_name in names(category_mapping)) {
+    patterns <- category_mapping[[cat_name]]
+    if(any(sapply(patterns, function(p) grepl(p, feature_name)))) {
+      return(cat_name)
+    }
+  }
+  return("Other")
+}
+```
+
+## Get Factorized Cluster Labels w/o Agreeableness
+
+```{r}
+library(dplyr)
+category_colors <- c(
+  "BIG5" = "#808080",
+  "Moral Foundations (MFQ)" = "#009E73",
+  "Religious & Spiritual" = "#F0E442", 
+  "Risk Taking (GRiPS)" = "#d62728",
+  "Interpersonal Reactivity" = "#88CCEE",
+  "Values (Schwartz)" = "#AA4499",
+  "Political" = "#117733",
+  "Demographics" = "#882255",
+  "Moral Commitments" = "#bcbd22",
+  "Numeracy" = "#661100",
+  "Optimize" = "#332288",
+  "Human Mind" = "#D55E00"
+  # "Other" = "#7f7f7f"
+)
+
+# Update category mapping to separate BIG5 dimensions based on scoring key
+category_mapping <- list(
+  "BIG5" = c("BIG5_1", "BIG5_6", "BIG5_11", "BIG5_16", "BIG5_21", "BIG5_26", "BIG5_31", "BIG5_36", "BIG5_41", "BIG5_46", "BIG5_51", "BIG5_56", "BIG5_3", "BIG5_8", "BIG5_13", "BIG5_18", "BIG5_23", "BIG5_28", "BIG5_33", "BIG5_38", "BIG5_43", "BIG5_48", "BIG5_53", "BIG5_58", "BIG5_4", "BIG5_9", "BIG5_14", "BIG5_19", "BIG5_24", "BIG5_29", "BIG5_34", "BIG5_39", "BIG5_44", "BIG5_49", "BIG5_54", "BIG5_59", "BIG5_5", "BIG5_10", "BIG5_15", "BIG5_20", "BIG5_25", "BIG5_30", "BIG5_35", "BIG5_40", "BIG5_45", "BIG5_50", "BIG5_55", "BIG5_60"),
+  
+  # Rest of categories remain the same
+  "Moral Foundations (MFQ)" = "^MFSQ",
+  "Religious & Spiritual" = c("^Religion", "^AttendChurch", "Spirituality", "Religiosity", "^ReligiousActivity", "meditation"),
+  "Risk Taking (GRiPS)" = "^GRiPS_",
+  "Interpersonal Reactivity" = c("^PT", "^EC", "^PD", "^FS"),
+  "Values (Schwartz)" = c("TRADITION", "SELF.DIRECTION", "SECURITY", "CONFORMITY", "BENEVOLENCE",
+                          "POWER", "ACHIEVEMENT", "STIMULATION", "HEDONISM", "UNIVERSALISM"),
+  "Political" = c("^Political_Party", "liberal", "conservative", "republican", "democrat", "independent"),
+  "Demographics" = c("^education", "^RelationshipStatus", "age", "^sex", "race_ethnicity", "YearOfEducation"),
+  "Moral Commitments" = "^MC_",
+  "Numeracy" = c("^Berlin", "^SNS"),
+  "Optimize" = "Optimize",
+  "Human Mind" = "HumanMind"
+)
+
+# Define parameter names with expressions for rendering
+measure_names <- c(
+  "time" = expression(s[time]),
+  "b_gain" = expression(nu[beta[gain]]),
+  "b_risk" = expression(nu[beta[risk]]),
+  "alpha" = expression(alpha),
+  "theta" = expression(tau),
+  "bias" = expression(z)
+)
+
+# Function to map to the categories we hard-coded above
+get_category <- function(feature_name) {
+  for(cat_name in names(category_mapping)) {
+    patterns <- category_mapping[[cat_name]]
+    if(any(sapply(patterns, function(p) grepl(p, feature_name)))) {
+      return(cat_name)
+    }
+  }
+  return("Other")
+}
+```
+
+
+
+## Run Permutation Test
+
+For this permutation test, we will shuffle the importance values for all of the different questions, and then recompute cluster means. The null distribution will be the cluster mean of each region in question. 
+
+```{r}
+run_permutation_test <- function(data, feature_name) {
+data_plt <- data %>%
+  mutate(
+    Category = sapply(Feature, get_category),
+    StdError = StdError,
+    Importance = Importance
+  ) %>%
+  arrange(desc(Importance))
+
+set.seed(123) # Set seed for reproducibility
+
+# Define the number of permutations
+n_permutations <- 10000
+
+# Initialize a dataframe to store results
+results <- data.frame(Category = character(), P_Value = numeric(), stringsAsFactors = FALSE)
+
+# Loop through each category in category_mapping
+for (category_name in names(category_mapping)) {
+  
+  # Subset the Importance values for the given category
+  category_importance <- data_plt$Importance[data_plt$Category == category_name]
+  
+  # Compute the observed mean
+  test_mean <- mean(category_importance, na.rm = TRUE)
+  test_sd <- sd(category_importance, na.rm = TRUE)
+  
+  # Generate the null distribution by shuffling Importance values
+  null_distribution <- replicate(n_permutations, {
+    shuffled_importance <- sample(data_plt$Importance)
+    mean(shuffled_importance[data_plt$Category == category_name], na.rm = TRUE)
+  })
+  
+  # Compute the p-value: proportion of times test_mean is greater than or equal to null_distribution
+  p_value <- mean(test_mean >= null_distribution)
+  
+  # Store results in dataframe
+  results <- rbind(results, data.frame(Category = category_name, test_mean = test_mean, test_sd = test_sd,P_Value = p_value, 
+      Null_Distribution = I(list(null_distribution))))
+}
+
+# Display results
+return(results)
+}
+
+
+# Create plots for each measure
+measures <- c("time", "b_gain", "b_risk", "alpha", "theta", "bias")
+
+# Run the permutation test for each measure and store results as a named list
+results <- setNames(lapply(measures, function(measure) {
+  run_permutation_test(importance_results[[measure]], measure)
+}), measures)
+```
+
+
+# Do the permutation test (OLD)
+
+## Product of Importance and Valence
+
+We will use the raw importance values and multiply it by the valence score
+
+```{r}
+library(dplyr)
+library(vader)  # Install the vader package for sentiment analysis
+
+# Precompute valence scores for all dataframes in results_list
+results_list <- lapply(results_list, function(df) {
+  df <- df %>%
+    mutate(valence = vader_df(text)$compound)  # Precompute valence scores
+  return(df)
+})
+
+# Function to compute total_valence_score using precomputed valence
+compute_total_valence_score <- function(df) {
+  df %>%
+    mutate(score = Importance * valence) %>%
+    summarize(total_valence_score = sum(score, na.rm = TRUE)) %>%
+    pull(total_valence_score)
+}
+
+compute_top10_valence_score <- function(df) {
+  # Sort the dataframe by the desired column (e.g., Importance) in descending order
+  df_top10 <- df %>%
+    arrange(desc(Importance)) %>%  # Replace Importance with the column to sort by
+    slice_head(n = 10)  # Select the top 10 rows
+  
+  # Compute the total_valence_score for the top 10 rows
+  df_top10 %>%
+    mutate(score = Importance * valence) %>%
+    summarize(total_valence_score = sum(score, na.rm = TRUE)) %>%
+    pull(total_valence_score)
+}
+
+# Permutation test function
+perform_permutation_test <- function(df, n_permutations = 1000) {
+  # Compute the original total_valence_score
+  original_score <- compute_total_valence_score(df)
+  
+  # Perform permutations
+  permuted_scores <- replicate(n_permutations, {
+    shuffled_df <- df %>%
+      mutate(Importance = sample(Importance))  # Shuffle Importance values
+    compute_total_valence_score(shuffled_df)
+  })
+  
+  # Compute the probability that the original score is higher than permuted scores
+  p_value <- mean(original_score > permuted_scores)
+  
+  list(
+    original_score = original_score,
+    p_value = p_value
+  )
+}
+
+# Permutation test function
+perform_permutation_test_top10 <- function(df, n_permutations = 1000) {
+  # Compute the original total_valence_score
+  original_score <- compute_top10_valence_score(df)
+  
+  # Perform permutations
+  permuted_scores <- replicate(n_permutations, {
+    shuffled_df <- df %>%
+      mutate(Importance = sample(Importance))  # Shuffle Importance values
+    compute_top10_valence_score(shuffled_df)
+  })
+  
+  # Compute the probability that the original score is higher than permuted scores
+  p_value <- mean(original_score > permuted_scores)
+  
+  list(
+    original_score = original_score,
+    p_value = p_value
+  )
+}
+
+# Apply the permutation test to all dataframes in results_list
+results_with_probabilities <- lapply(results_list, function(df) {
+  perform_permutation_test(df)
+})
+
+results_with_probabilities_top10 <- lapply(results_list, function(df) {
+  perform_permutation_test_top10(df)
+})
+```
+
+## Product of rank and importance
+
+```{r}
+# Function to compute total_valence_score using rank * valence
+compute_rank_valence_score <- function(df) {
+  df %>%
+    mutate(score = (NROW(df) - rank) * valence) %>%  # Compute score as rank * valence
+    summarize(total_valence_score = sum(score, na.rm = TRUE)) %>%
+    pull(total_valence_score)
+}
+
+compute_top10_rank_valence_score <- function(df) {
+  # Sort the dataframe by the desired column (e.g., Importance) in descending order
+  df_top10 <- df %>%
+    arrange(rank) %>%  # Replace Importance with the column to sort by
+    slice_head(n = 10)  # Select the top 10 rows
+  
+  df_top10 %>%
+    mutate(score = (NROW(df) - rank) * valence) %>%  # Compute score as rank * valence
+    summarize(total_valence_score = sum(score, na.rm = TRUE)) %>%
+    pull(total_valence_score)
+}
+
+# Permutation test with shuffled ranks
+perform_rank_permutation_test <- function(df, n_permutations = 1000) {
+  df = df %>%
+    mutate(rank = row_number())  # Assign rank based on row number
+  # Compute the original total_valence_score
+  original_score <- compute_rank_valence_score(df)
+  
+  # Perform permutations
+  permuted_scores <- replicate(n_permutations, {
+    shuffled_df <- df %>%
+      mutate(rank = sample(row_number()))  # Shuffle row numbers
+    compute_rank_valence_score(shuffled_df)
+  })
+  
+  # Compute the probability that the original score is higher than permuted scores
+  p_value <- mean(original_score > permuted_scores)
+  
+  list(
+    original_score = original_score,
+    p_value = p_value
+  )
+}
+
+perform_rank_permutation_test_top10 <- function(df, n_permutations = 1000) {
+  df = df %>%
+    mutate(rank = row_number())  # Assign rank based on row number
+  # Compute the original total_valence_score
+  original_score <- compute_top10_rank_valence_score(df)
+  
+  # Perform permutations
+  permuted_scores <- replicate(n_permutations, {
+    shuffled_df <- df %>%
+      mutate(rank = sample(row_number()))  # Shuffle row numbers
+    compute_top10_rank_valence_score(shuffled_df)
+  })
+  
+  # Compute the probability that the original score is higher than permuted scores
+  p_value <- mean(original_score > permuted_scores)
+  
+  list(
+    original_score = original_score,
+    p_value = p_value
+  )
+}
+
+# Apply the rank-based permutation test to all dataframes in results_list
+results_with_rank_probabilities <- lapply(results_list, function(df) {
+  perform_rank_permutation_test(df)
+})
+
+results_with_rank_probabilities_top10 <- lapply(results_list, function(df) {
+  perform_rank_permutation_test_top10(df)
+})
+```
+
+## Save Results
+
+```{r}
+save('results_list', 'results_with_probabilities', 'results_with_probabilities_top10', 'results_with_rank_probabilities', 'results_with_rank_probabilities_top10', file="PermutationTestResults.RData")
+```
+
+```{r}
+hist(results_list$time$valence, 20)
+```
+
+
+# Summary Statistics
+
+# NEW Regression Analysis
+
+This new regression analysis runs many different regressions in a loop so that all coefficients
+and p-values can be extracted efficiently.
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+
+# Define dependent and independent variables
+dependent_vars <- c("time", "b_gain", "b_risk", "alpha", "theta", "bias")
+independent_vars <- c("condition", "GRIPS", "consequentalism", "politics", 
+                      "Harm", "Fairness", "Loyalty", "Authority", "Sanctity", 
+                      "sex", "poly(age, 2, raw=TRUE)", "BerlinScore", "ReligiousFactor")
+
+# Initialize an empty data frame to store the results
+results <- data.frame(Independent_Var = character(), 
+                      Dependent_Var = character(),
+                      Beta = numeric(), 
+                      P_Value = numeric(), 
+                      stringsAsFactors = FALSE)
+
+# Loop through each dependent variable
+for(dep_var in dependent_vars) {
+  # Loop through each independent variable
+  for(ind_var in independent_vars) {
+    # Create the formula
+    formula <- as.formula(paste(dep_var, "~", ind_var))
+    
+    # Run the linear regression
+    model <- lm(formula, data = final_table)
+    
+    # Extract the beta coefficient and p-value (ignoring intercept)
+    summary_model <- summary(model)
+    coef_data <- summary_model$coefficients
+    
+    # Check if independent variable has multiple levels (for factors)
+    ind_var_rows <- grep(ind_var, rownames(coef_data))
+    
+    # Extract beta coefficient(s) and p-value(s) for the independent variable
+    for(i in ind_var_rows) {
+      beta <- coef_data[i, "Estimate"]
+      p_value <- coef_data[i, "Pr(>|t|)"]
+      t_value <- coef_data[i, "t value"]
+      
+      # Store the results in the results data frame
+      results <- rbind(results, data.frame(
+        Independent_Var = rownames(coef_data)[i],
+        Dependent_Var = dep_var,
+        Beta = beta,
+        P_Value = p_value,
+        T_Value = t_value
+      ))
+    }
+  }
+}
+
+# Print or inspect the results
+print(results)
+```
+
+```{r}
+save(results, file='final_ddm_regression_results.RData')
+```
+
+
+## Regresson for subscores
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+
+# Define dependent and independent variables
+dependent_vars <- c("time", "b_gain", "b_risk", "alpha", "theta", "bias")
+independent_vars <- c("MFSQ1", "MFSQ2", "MFSQ3", "MFSQ4", "MFSQ5", "MFSQ6", "MFSQ7", "MFSQ8", "MFSQ9", "MFSQ10", "MFSQ11", "MFSQ12", "MFSQ13", "MFSQ14", "MFSQ15", "MFSQ16", "MFSQ17", "MFSQ18", "MFSQ19", "MFSQ20", "MFSQ21", "MFSQ22", "MFSQ23", "MFSQ24", "MFSQ25", "MFSQ26", "MFSQ27", "MFSQ28", "MFSQ29", "MFSQ30", "MFSQ31", "MFSQ32", "GRiPS_1", "GRiPS_2", "GRiPS_3", "GRiPS_4", "GRiPS_5", "GRiPS_6", "GRiPS_7", "GRiPS_8", "Berlin1", "Berlin2", "Berlin3", "Berlin4"  )
+
+# Initialize an empty data frame to store the results
+subscore_results <- data.frame(Independent_Var = character(), 
+                      Dependent_Var = character(),
+                      Beta = numeric(), 
+                      P_Value = numeric(), 
+                      stringsAsFactors = FALSE)
+
+# Loop through each dependent variable
+for(dep_var in dependent_vars) {
+  # Loop through each independent variable
+  for(ind_var in independent_vars) {
+    # Create the formula
+    formula <- as.formula(paste(dep_var, "~", ind_var))
+    
+    # Run the linear regression
+    model <- lm(formula, data = final_table)
+    
+    # Extract the beta coefficient and p-value (ignoring intercept)
+    summary_model <- summary(model)
+    coef_data <- summary_model$coefficients
+    
+    # Check if independent variable has multiple levels (for factors)
+    ind_var_rows <- grep(ind_var, rownames(coef_data))
+    
+    # Extract beta coefficient(s) and p-value(s) for the independent variable
+    for(i in ind_var_rows) {
+      beta <- coef_data[i, "Estimate"]
+      p_value <- coef_data[i, "Pr(>|t|)"]
+      t_value <- coef_data[i, "t value"]
+      
+      # Store the results in the subscore_results data frame
+      subscore_results <- rbind(subscore_results, data.frame(
+        Independent_Var = rownames(coef_data)[i],
+        Dependent_Var = dep_var,
+        Beta = beta,
+        P_Value = p_value,
+        T_Value = t_value
+      ))
+    }
+  }
+}
+
+# Print or inspect the results
+print(subscore_results)
+```
+
+## Correlating Metrics to Each Other
+
+```{r}
+library(corrplot)
+
+# Select the relevant columns from final_table
+selected_data <- final_table %>%
+  select(all_of(independent_vars))
+
+# Compute the correlation matrix
+cor_matrix <- cor(selected_data, use = "complete.obs")
+
+# Display the correlation heatmap
+corrplot(cor_matrix, method = "color", type = "lower", 
+         tl.col = "black", tl.srt = 45, 
+         col = colorRampPalette(c("blue", "white", "red"))(200),
+         title = "Correlation Heatmap")
+```
+
+
+# DEPRECATED CODE
+
+# Import Data
+
+```{r}
+# Load and prepare data
+behavior_path <- "C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/data/FINAL_RT_EXCLUDED_DATA_20241014.RData"
+load(behavior_path)
+
+# Data preprocessing
+risk_data <- risk_data %>%
+  mutate(
+    rt = rt / 1000, # Convert reaction time to seconds
+    response = ifelse(experimental_treatment_selected == "Yes to treatment", 1, 0),
+    RT = if_else(response == 0, -rt, rt), # Negative RT for 'No' responses
+    risk = risk * 0.01, # Convert percentages to proportions
+    gain = gain * 0.01,
+    no_effect = no_effect * 0.01,
+    idxP = as.numeric(as.factor(user_id)) # Create numeric subject index
+  ) 
+
+# Filter out rows where sex is "Other"
+risk_data <- risk_data %>% filter(sex != "Other")
+
+# ddm_path <- "C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM/NeuroethicsPosteriorAndPredictions.RData"
+# load(ddm_path)
+```
+
+## (DEPRECATED) Extract Demographic Data 
+
+Certain columns I will not be including because they do not have enough variance. I will only include things that
+purely represent ideological variables, not demographic variables.
+
+**We are deprecating the following code because the current analysis wants to look at all subscore metrics as well**
+
+```{r}
+clean_data_summary <- risk_data %>%
+  group_by(user_id) %>%
+  summarise(
+    # race_ethnicity = first(race_ethnicity),
+    idxP = first(idxP),
+    sex = first(sex),
+    age = first(age),
+    condition = first(condition),
+    Religiosity = first(Religiosity),
+    Spirituality = first(Spirituality),
+    AttendChurch = first(AttendChurch),
+    ReligiousActivity = first(ReligiousActivity),
+    meditation = first(meditation),
+    Political_Party = first(Political_Party),
+    republican = first(republican),
+    democrat = first(democrat),
+    independent = first(independent),
+    conservative = first(conservative),
+    liberal = first(liberal),
+    conservatismFactor = first(conservatismFactor),
+    HumanMind = first(HumanMind),
+    Optimize = first(Optimize),
+    Extraversion = first(Extraversion),
+    Agreeableness = first(Agreeableness),
+    Conscientiousness = first(Conscientiousness),
+    Neuroticism = first(Neuroticism),
+    Openness = first(Openness),
+    Harm = first(Harm),
+    Fairness = first(Fairness),
+    Loyalty = first(Loyalty),
+    Athority = first(Athority),
+    Sancticy = first(Sancticy),
+    PerspectiveTaking = first(PerspectiveTaking),
+    Fantasy = first(Fantasy),
+    EmpathicConcern = first(EmpathicConcern),
+    PersonalDistress = first(PersonalDistress),
+    POWER = first(POWER),
+    SELF.DIRECTION = first(SELF.DIRECTION),
+    ACHIEVEMENT = first(ACHIEVEMENT),
+    HEDONISM = first(HEDONISM),
+    STIMULATION = first(STIMULATION),
+    UNIVERSALISM = first(UNIVERSALISM),
+    BENEVOLENCE = first(BENEVOLENCE),
+    TRADITION = first(TRADITION),
+    CONFORMITY = first(CONFORMITY),
+    SECURITY = first(SECURITY),
+    Lying = first(Lying),
+    Assasination = first(Assasination),
+    Torture = first(Torture),
+    Murder = first(Murder),
+    Stealing = first(Stealing),
+    ForcedSterilization = first(ForcedSterilization),
+    consequentalism = first(consequentialism.score),
+    moral.commitment = first(moral.commitment),
+    SNS.total = first(SNS.total),
+    SNS.ability = first(SNS.ability),
+    SNS.preference = first(SNS.preference),
+    Berlin1 = first(Berlin1),
+    Berlin2 = first(Berlin2),
+    Berlin3 = first(Berlin3),
+    Berlin4 = first(Berlin4),
+    BerlinScore = first(BerlinScore),
+    GRiPs_Score = first(GRiPs_Score)
+  )
+
+clean_data_summary <- clean_data_summary %>%
+  mutate(age_poly1 = poly(age, 2, raw = FALSE)[, 1],
+         age_poly2 = poly(age, 2, raw = FALSE)[, 2])
+
+clean_data_summary <- clean_data_summary %>% select(-age)
+
+# Not computing any summary metrics currently because we are including all of the factors inside of the regression
+# clean_data_summary$politics = clean_data_summary$republican + clean_data_summary$conservative - clean_data_summary$democrat - clean_data_summary$liberal
+```
+
+## Extract Religiosity Score
+
+For now, extracting factor scores may not be as necessary since I'm including all of the different subcomponents. 
+
+```{r}
+library(psych)
+religiousMatrix <- data.matrix(clean_data_summary[,c("Religiosity", "Spirituality", "AttendChurch", "ReligiousActivity")]) - 1
+
+#Kaiser-Meyer-Olkin factor adequacy
+KMO <- psych::KMO(religiousMatrix)
+KMO
+KMO$ImCov
+
+#	Bartlett's Test of Sphericity
+REdaS::bart_spher(religiousMatrix)
+
+scree <- psych::polychoric(religiousMatrix)$rho
+evals <- eigen(scree)$values
+print(scree, cutoff = "0.3")
+scree(scree, factors = F)
+
+#religiousMatrix <- psych::polychoric(religiousMatrix)
+EFA <- fa(religiousMatrix, nfactors = 1, rotate = "oblimin", fm ="ml")
+print(EFA$loadings, cutoff = "0.4")
+#round(EFA$Phi, 3)
+(evals/sum(evals)*100)[1:4]
+EFA$communalities
+
+religiousMatrix.efa <- fa(religiousMatrix, nfactors = 1, rotate = "oblimin", fm ="ml", cor = "poly", scores = "regression")
+print(religiousMatrix.efa)
+fa.diagram(religiousMatrix.efa)
+
+print(religiousMatrix.efa$loadings, cutoff = "0.3")
+clean_data_summary$ReligiousFactor <- religiousMatrix.efa$scores
+# data.religious$ReligiousFactor<- religious.efa$scores
+```
+
+## 'alpha' parameter (boundary)
+
+### Condition
+
+```{r}
+# final_table$condition <- relevel(final_table$condition, "Motor Function")
+model = lm(alpha ~ condition, data=final_table)
+summary(model)
+```
+
+### GRIPS
+
+```{r}
+model = lm(alpha ~ GRIPS, data=final_table)
+summary(model)
+```
+
+### Consequentialism
+
+```{r}
+model = lm(alpha ~ consequentalism, data=final_table)
+summary(model)
+```
+
+### Politics
+
+```{r}
+model = lm(alpha ~ politics, data=final_table)
+summary(model)
+```
+
+### Religion
+
+### Moral Intuitions
+
+```{r}
+model = lm(alpha ~ Harm, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(alpha ~ Fairness, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(alpha ~ Loyalty, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(alpha ~ Athority, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(alpha ~ Sancticy, data=final_table)
+summary(model)
+```
+
+## 'bias' parameter (boundary)
+
+### Consequentialism
+
+```{r}
+model = lm(bias ~ consequentalism, data=final_table)
+summary(model)
+```
+
+### Condition
+
+```{r}
+final_table$condition <- relevel(final_table$condition, "Motor Function")
+model = lm(bias ~ condition, data=final_table)
+summary(model)
+```
+
+
+### Politics
+
+```{r}
+model = lm(bias ~ politics, data=final_table)
+summary(model)
+```
+
+### Religion
+
+### Moral Intuitions
+
+```{r}
+model = lm(bias ~ Harm, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(bias ~ Fairness, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(bias ~ Loyalty, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(bias ~ Athority, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(bias ~ Sancticy, data=final_table)
+summary(model)
+```
+
+
+
+## 'b1' parameter (gain drift rate)
+
+### GRIPS
+
+```{r}
+model = lm(b_gain ~ GRIPS, data=final_table)
+summary(model)
+```
+
+### Politics
+
+```{r}
+model = lm(b_gain ~ politics, data=final_table)
+summary(model)
+```
+
+### Religion
+
+### Moral Intuitions
+
+```{r}
+model = lm(b_gain ~ Harm, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(b_gain ~ Fairness, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(b_gain ~ Loyalty, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(b_gain ~ Athority, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(b_gain ~ Sancticy, data=final_table)
+summary(model)
+```
+
+## 'b2' parameter (risk drift rate)
+
+### GRIPS
+
+```{r}
+model = lm(b_risk ~ GRIPS, data=final_table)
+summary(model)
+```
+
+### age
+
+```{r}
+model = lm(b_risk ~ poly(age, 2), data=final_table)
+summary(model)
+```
+### SEX
+
+```{r}
+model = lm(b_risk ~ sex, data=final_table)
+summary(model)
+
+aov_output = aov(b_risk ~ sex, data=final_table)
+summary(aov_output)
+
+TukeyHSD(aov_output)
+```
+
+### Politics
+
+```{r}
+model = lm(b_risk ~ politics, data=final_table)
+summary(model)
+```
+
+### Religion
+
+### Moral Intuitions
+
+```{r}
+model = lm(b_risk ~ Harm, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(b_risk ~ Fairness, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(b_risk ~ Loyalty, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(b_risk ~ Athority, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(b_risk ~ Sancticy, data=final_table)
+summary(model)
+```
+
+## 'time' parameter (risk drift rate)
+
+```{r}
+final_table$condition <- relevel(final_table$condition, "Motor Function")
+model = lm(time ~ condition, data=final_table)
+summary(model)
+
+aov_output = aov(time ~ condition, data=final_table)
+summary(aov_output)
+
+TukeyHSD(aov_output)
+```
+
+### sex
+
+```{r}
+model = lm(time ~ sex, data=final_table)
+summary(model)
+```
+
+### age
+
+```{r}
+model = lm(time ~ poly(age, 2), data=final_table)
+summary(model)
+```
+
+### GRIPS
+
+Positive time parameter means risk comes first.
+Negative time parameter means benefit comes first.
+
+Interpretation: Higher GRIPS -> benefit calculation happens first
+
+```{r}
+model = lm(time ~ GRIPS, data=final_table)
+summary(model)
+```
+
+### Consequentialism
+
+```{r}
+model = lm(time ~ consequentalism, data=final_table)
+summary(model)
+```
+
+### Politics
+
+```{r}
+model = lm(time ~ politics, data=final_table)
+summary(model)
+```
+
+### Religion
+
+### Moral Intuitions
+
+```{r}
+model = lm(time ~ Harm + Fairness + Loyalty + Athority + Sancticy, data=final_table)
+summary(model)
+```
+
+
+```{r}
+model = lm(time ~ Harm, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(time ~ Fairness, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(time ~ Loyalty, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(time ~ Athority, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(time ~ Sancticy, data=final_table)
+summary(model)
+```

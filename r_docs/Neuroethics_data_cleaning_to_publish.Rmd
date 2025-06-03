@@ -1,0 +1,527 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Kiante Fernandez
+
+# NOTE THAT THIS IS THE DOC THAT YOU WILL CLEAN AND REDO SO THAT WE CAN SHARE THE DATA CLEANING STEPS
+# THIS MEANS YOU HAVE TO GO THROUGH AND DOCUMENT EACH STEP AND CREATE FUNCTIONS WHERE NEEDED 
+
+
+##Set the stage
+```{r load libraries }
+library(tidyverse)
+library(psych)
+library(car)
+library(mfx)
+library(broom)
+library(kableExtra)
+library(here)
+```
+
+```{r Import task data, message=FALSE, warning=FALSE, include=FALSE}
+# Disable scientific notation
+options(scipen=999)
+
+#pull data in terminal: aws s3 sync s3://neuroethics-task .
+files <- list.files(path = here("data", "raw_mturk_data", "mturk_data_05202020"), pattern = "*.csv", full.names = T)
+#load the raw data and select the relevant cols
+raw.data <- map_dfr(files, readr::read_csv) %>% 
+ dplyr::select(c("user_id", "rt", "key_press", "trial_index", "time_elapsed", 
+"condition", "condition_per_trial", "total_trials", "treatment_display", 
+"risk", "gain", "no_effect", "experimental_treatment_selected")) %>% 
+  na.omit() -> raw.data
+
+task_time <- raw.data %>% 
+  dplyr::select(user_id,trial_index,time_elapsed) %>% 
+  filter(trial_index == 229) %>% 
+  mutate(time_elapsed = time_elapsed/60000)
+```
+
+```{r survey data integration}
+survey = read.csv(here("data","Qualtrics_Data","May_20_2020.csv"), header=TRUE, comment.char="#", stringsAsFactors=TRUE) %>% filter(batch >= 3) 
+#filter so that we only get the raw data for the non pilot batches (which is all data batch 3 and above)
+survey_raw <- survey %>% 
+  left_join(raw.data, by = "user_id") %>% 
+  group_by(user_id)
+
+#survey_raw = merge(raw.data, survey, by = "user_id")
+
+raw.data <- survey_raw %>% 
+  dplyr::select(c("user_id", "rt", "key_press", "trial_index", "time_elapsed", 
+"condition", "condition_per_trial", "total_trials", "treatment_display", 
+"risk", "gain", "no_effect", "experimental_treatment_selected", "Progress", "Duration..in.seconds.", "RecordedDate", "ResponseId", "MFSQ1", "MFSQ2", "MFSQ3", 
+"MFSQ4", "MFSQ5", "MFSQ6", "MFSQ7", "MFSQ8", "MFSQ9", "MFSQ10", 
+"MFSQ11", "MFSQ12", "MFSQ13", "MFSQ14", "MFSQ15", "MFSQ16", "attention_check.1", 
+"MFSQ17", "MFSQ18", "MFSQ19", "MFSQ20", "MFSQ21", "MFSQ22", "MFSQ23", 
+"MFSQ24", "MFSQ25", "MFSQ26", "MFSQ27", "MFSQ28", "MFSQ29", "MFSQ30", 
+"MFSQ31", "MFSQ32", "attention_check.2", "BIG5_1", "BIG5_2", 
+"BIG5_3", "BIG5_4", "BIG5_5", "BIG5_6", "BIG5_7", "BIG5_8", "BIG5_9", 
+"BIG5_10", "BIG5_11", "BIG5_12", "BIG5_13", "BIG5_14", "BIG5_15", 
+"BIG5_16", "BIG5_17", "BIG5_18", "BIG5_19", "BIG5_20", "BIG5_21", 
+"BIG5_22", "BIG5_23", "BIG5_24", "BIG5_25", "BIG5_26", "BIG5_27", 
+"BIG5_28", "BIG5_29", "BIG5_30", "BIG5_31", "BIG5_32", "BIG5_33", 
+"BIG5_34", "BIG5_35", "BIG5_36", "BIG5_37", "BIG5_38", "BIG5_39", 
+"BIG5_40", "BIG5_41", "BIG5_42", "BIG5_43", "BIG5_44", "BIG5_45", 
+"BIG5_46", "BIG5_47", "BIG5_48", "BIG5_49", "BIG5_50", "BIG5_51", 
+"BIG5_52", "BIG5_53", "BIG5_54", "BIG5_55", "BIG5_56", "BIG5_57", 
+"BIG5_58", "BIG5_59", "BIG5_60", "sex", "age", "race_ethnicity", 
+"education", "ReligionRaised", "ReligionNow", "Religiosity", 
+"Spirituality", "AttendChurch", "ReligiousActivity", "meditation", 
+"RelationshipStatus", "Income", "Major", "YearOfEducation", "EmploymentStatus", 
+"Political_Party", "HumanMind", "Optimize", "republican", "democrat", 
+"independent", "conservative", "liberal", "POWER", "SELF.DIRECTION", 
+"ACHIEVEMENT", "HEDONISM", "STIMULATION", "UNIVERSALISM", "attention_check.3", 
+"BENEVOLENCE", "TRADITION", "CONFORMITY", "SECURITY", "MC_Lying", 
+"MC_Assassin", "MC_Torture", "MC_Murder", "MC_Stealing", "MC_Steril", 
+"FS1", "EC1", "PT1", "EC2", "FS2", "PD1", "FS3", "PT2", "EC3", 
+"PD2", "PT3", "FS4", "PD3", "EC4", "PT4", "FS5", "PD4", "EC5", 
+"PD5", "EC6", "PT5", "EC7", "FS6", "attention_check.4", "PD6", 
+"PT6", "FS7", "PD7", "PT7", "SNS1", "SNS2", "SNS3", "SNS4", "SNS5", 
+"SNS6", "SNS7", "SNS8", "Berlin1", "Berlin2", "Berlin3", "Berlin4", 
+"GRiPS_1", "GRiPS_2", "GRiPS_3", "GRiPS_4", "GRiPS_5", "GRiPS_6", 
+"GRiPS_7", "GRiPS_8", "Q1802_1", "Q1802_2", "Q1802_3", 
+"Q1802_4", "Q1802_5", "Q1802_6", "Q1802_7")) 
+#save the raw_data
+write.csv(raw.data, file = paste("../data/raw_mturk_data/raw.csv"))
+```
+
+```{r  Transform task data, message=FALSE, warning=FALSE, include=FALSE}
+#assign our raw data to the new cleaned data
+clean.data <- raw.data
+survey <-  survey[,-c(1:17)] #remove the cols from suvey that are not needed for scoring
+```
+#Exclusions
+```{r remove pilot data, eval=FALSE}
+#this removes the subjects task data that were collected on deployment OR people
+#who took the task more than once before we put the rule in place
+#Remove Duplicates
+REMOVE = c(
+  "wpchz8fz",
+  "tdDTyNLl",
+  "CUyB01Th",
+  "d9UbV0sj",
+  "PiGCo5DO",
+  "yCZDIVJF",
+  "WUTFOue2",
+  "Rp8H93tM",
+  "9Z5vJ7oT",
+  "esSkjqdS",
+  "XNHqndg3",
+  "spGR9XvT",
+  "qf27dbHj",
+  "y6m1AOsD",
+  "hgbHHiLn",
+  "Ly8mJkxP"
+)
+for (i in REMOVE){
+clean.data <- clean.data %>% 
+  filter(!str_detect(user_id, i))
+}
+
+Double.REMOVE = read.csv(here("data", "Redundancies.csv"), header=TRUE, comment.char="#", stringsAsFactors=TRUE)
+
+for (i in Double.REMOVE$Completion_Code){
+  clean.data <- clean.data %>% 
+    filter(!str_detect(ResponseId, i))
+}
+```
+
+```{r exclusion effort responce check}
+#Remove subjects who failed attention checks attention checks
+#Remove subjects who took below 5 mins
+#Remove trials with RT outside the specifications; between 90000ms and 250ms 
+clean.data %>% 
+  filter(attention_check.1 == 1) %>% 
+  filter(attention_check.2 == 1) %>% 
+  filter(attention_check.3 == 1) %>% 
+  filter(attention_check.4 == 1) %>% 
+  mutate(time2completion  = Duration..in.seconds./60) %>% 
+  filter(time2completion >= 5) %>% 
+  filter(rt <= 90000 & rt >= 250) -> clean.data
+#Remove Subjects who do not have at least 40 trials
+clean.data <-  subset(clean.data, with(clean.data, user_id %in% names(which(table(user_id)>=40))))
+```
+
+#measures scoring
+```{r Personlity Big 5}
+Big5 <- c("BIG5_1", "BIG5_6", "BIG5_11", "BIG5_16","BIG5_21", "BIG5_26", "BIG5_31", "BIG5_36", "BIG5_41", "BIG5_46", "BIG5_51", "BIG5_56", "BIG5_2", "BIG5_7", "BIG5_12", "BIG5_17", 
+                                        "BIG5_22", "BIG5_27", "BIG5_32", "BIG5_37", 
+                                        "BIG5_42", "BIG5_47", "BIG5_52", "BIG5_57",
+          "BIG5_3", "BIG5_8", "BIG5_13", "BIG5_18",
+                                        "BIG5_23", "BIG5_28", "BIG5_33", "BIG5_38", 
+                                        "BIG5_43", "BIG5_48", "BIG5_53", "BIG5_58",
+          "BIG5_4", "BIG5_9", "BIG5_14", "BIG5_19", 
+                                        "BIG5_24", "BIG5_29", "BIG5_34", "BIG5_39", 
+                                        "BIG5_44", "BIG5_49", "BIG5_54", "BIG5_59",
+          "BIG5_5", "BIG5_10", "BIG5_15", "BIG5_20", 
+                                        "BIG5_25", "BIG5_30", "BIG5_35", "BIG5_40", 
+                                        "BIG5_45", "BIG5_50", "BIG5_55", "BIG5_60"
+          ) 
+B5 <- survey[,Big5]
+
+Big5key <- list(   Extraversion      =c("BIG5_1", "BIG5_6", "BIG5_11", "BIG5_16", 
+                                        "BIG5_21", "BIG5_26", "BIG5_31", "BIG5_36", 
+                                        "BIG5_41", "BIG5_46", "BIG5_51", "BIG5_56"),
+                   Agreeableness     =c("BIG5_2", "BIG5_7", "BIG5_12", "BIG5_17", 
+                                        "BIG5_22", "BIG5_27", "BIG5_32", "BIG5_37", 
+                                        "BIG5_42", "BIG5_47", "BIG5_52", "BIG5_57"),
+                   Conscientiousness =c("BIG5_3", "BIG5_8", "BIG5_13", "BIG5_18",
+                                        "BIG5_23", "BIG5_28", "BIG5_33", "BIG5_38", 
+                                        "BIG5_43", "BIG5_48", "BIG5_53", "BIG5_58"),
+                   Neuroticism       =c("BIG5_4", "BIG5_9", "BIG5_14", "BIG5_19", 
+                                        "BIG5_24", "BIG5_29", "BIG5_34", "BIG5_39", 
+                                        "BIG5_44", "BIG5_49", "BIG5_54", "BIG5_59"),
+                   Openness          =c("BIG5_5", "BIG5_10", "BIG5_15", "BIG5_20", 
+                                        "BIG5_25", "BIG5_30", "BIG5_35", "BIG5_40", 
+                                        "BIG5_45", "BIG5_50", "BIG5_55", "BIG5_60"))
+
+B5sc <- scoreItems(Big5key,B5)
+```
+
+```{r Moral Foundations Survey}
+MFQ <- cbind(survey[,4:36], survey[1])
+MFQ <- MFQ[,-17]#take out attention check
+
+MFQkey <- list(     Harm     <- c("MFSQ1","MFSQ7","MFSQ12","MFSQ17","MFSQ23","MFSQ28"),
+                    Fairness <- c("MFSQ2","MFSQ8","MFSQ13","MFSQ18","MFSQ24","MFSQ29"),
+                    Loyalty  <- c("MFSQ3","MFSQ9","MFSQ14","MFSQ19","MFSQ25","MFSQ30"),
+                    Athority <- c("MFSQ4","MFSQ10","MFSQ15","MFSQ20","MFSQ26","MFSQ31"),
+                    Sancticy <- c("MFSQ5","MFSQ11","MFSQ16","MFSQ21","MFSQ27","MFSQ32"))
+names(MFQkey) <-  c("Harm","Fairness","Loyalty","Athority","Sancticy")
+
+MFQsc <- scoreItems(MFQkey,MFQ)
+```
+
+```{r Empathy-IRI; Interpersonal Reactivity Index}
+IRI <- cbind(survey[,139:167], survey[1])
+IRI <- IRI[,-24]#take out attention check
+
+IRIkey <- list(PerspectiveTaking <- c("PT1","PT2","PT3","PT4","PT5","PT6","PT7"),
+               Fantasy           <- c("FS1","FS2","FS3","FS4","FS5","FS6","FS7"),
+               EmpathicConcern   <- c("EC1","EC2","EC3","EC4","EC5","EC6","EC7"),
+               PersonalDistress  <- c("PD1","PD2","PD3","PD4","PD5","PD6","PD7"))
+names(IRIkey) <- c("PerspectiveTaking","Fantasy","EmpathicConcern","PersonalDistress")
+
+IRIsc <- scoreItems(IRIkey,IRI)
+```
+
+```{r Short Schwartzs Value Survey, eval=FALSE, include=FALSE}
+SVS <- cbind(survey[,122:132], survey[1])
+SVS <- SVS[,-7]#take out attention check
+
+SVSkey <- list(
+  POWER <- "POWER",
+  SELF.DIRECTION <- "SELF.DIRECTION",
+  ACHIEVEMENT <- "ACHIEVEMENT",
+  HEDONISM <- "HEDONISM",
+  STIMULATION <- "STIMULATION",
+  UNIVERSALISM <- "UNIVERSALISM",
+  BENEVOLENCE <- "BENEVOLENCE",
+  TRADITION <- "TRADITION",
+  CONFORMITY <- "CONFORMITY",
+  SECURITY<- "SECURITY")
+
+names(SVSkey) <- c("POWER", "SELF.DIRECTION", "ACHIEVEMENT", "HEDONISM", "STIMULATION", 
+"UNIVERSALISM", "BENEVOLENCE", "TRADITION", "CONFORMITY", "SECURITY")
+
+SVSsc <- scoreItems(SVSkey,SVS)
+```
+
+```{r Lombrozo Moral Commitments task}
+#need to fix how is scored
+MC <- cbind(survey[1], survey[,133:138])
+colnames(MC) = c( 'user_id', 'Lying','Assasination','Torture','Murder','Stealing','ForcedSterilization')
+
+MC %>% 
+  group_by(user_id) %>% 
+  mutate(count = sum(Lying, Assasination, Torture, Murder,Stealing, ForcedSterilization))%>% 
+  mutate(consequentialism.score = round(count/6, 3)) %>% 
+  mutate(moral.commitment = if_else(consequentialism.score > .5,"Consequentialist", "Deontological"))-> MC
+
+MC$moral.commitment <- as.factor(MC$moral.commitment)
+MC$moral.commitment <- relevel(MC$moral.commitment, "Deontological")
+```
+
+```{r Subjective Numeracy Scale (SNS)}
+SNS <- cbind(survey[,168:175], survey[1])
+
+SNSList <- list(
+  SNS.total <- SNS[,c(1,2,3,4,5,6,7,8)],
+  SNS.ability <- SNS[,c(1,2,3,4)],
+  SNS.preference <- SNS[,c(5,6,7,8)]
+)
+
+Results = list()
+for (i in 1:3){
+  totals <- apply(SNSList[[i]], 1, mean)
+  Results[[i]] = totals 
+}
+
+TEST = do.call(rbind, Results)
+colnames(TEST) = survey[,"user_id"]
+rownames(TEST) <- c('SNS.total','SNS.ability','SNS.preference')
+SNSsc <-  as.data.frame(t(TEST))
+```
+
+```{r Berlin Numeracy Test}
+Berlin.Numeracy.Test<- cbind(survey[, 176:179], survey[1])
+#Scoring = Based on answers to 1-4 questions following
+#Correct answers are as follows: 
+#1 = 25; 2 = 30; 3 =20; 4 = 50.
+Berlin <- c("Berlin1","Berlin2","Berlin3","Berlin4")
+Berlin.Numeracy.Test$Berlin1<- ifelse(Berlin.Numeracy.Test$Berlin1 == 25, 1,0)  
+Berlin.Numeracy.Test$Berlin2<- ifelse(Berlin.Numeracy.Test$Berlin2 == 30, 1,0)  
+Berlin.Numeracy.Test$Berlin3<- ifelse(Berlin.Numeracy.Test$Berlin3 == 20, 1,0)  
+Berlin.Numeracy.Test$Berlin4<- ifelse(Berlin.Numeracy.Test$Berlin4 == 50, 1,0)  
+
+Berlin.Numeracy.Test$BerlinScore <- apply(Berlin.Numeracy.Test[,Berlin], 1, function(X) sum(X))
+```
+
+```{r GRiPs}
+GRiPs <- cbind(survey[,180:187], survey[1])
+
+GRiPs.key <- list(c("GRiPS_1", "GRiPS_2", "GRiPS_3", "GRiPS_4",
+                    "GRiPS_5", "GRiPS_6", "GRiPS_7", "GRiPS_8"))
+names(GRiPs.key) <- "GRiPs_Score"
+
+GRiPsSc <- scoreItems(GRiPs.key,GRiPs)
+```
+
+```{r combine all scores}
+#cbind all the things here
+scores <- cbind(B5sc$scores, MFQsc$scores, IRIsc$scores, SNSsc, Berlin.Numeracy.Test$BerlinScore, GRiPsSc$scores, MC) %>% 
+dplyr::group_by(user_id) %>% 
+  nest()
+colnames(scores) = c("user_id", "scores")
+
+clean.data <- merge(clean.data, scores, "user_id")
+```
+
+```{r Demographics}
+clean.data$Income <-as.character(clean.data$Income) 
+clean.data$Income <- str_remove(clean.data$Income, "[>,]")
+clean.data$Income<- str_trim(clean.data$Income)
+clean.data$Income <- as.numeric(clean.data$Income)
+
+
+clean.data$education <- factor(clean.data$education,  
+                       labels = c("less than high school",
+                                  "high school degree", 
+                                  "bachelor", 
+                                  "masters", 
+                                  "Doctoral/Professional"),
+                       levels = c(1,2,3,4,5))
+
+clean.data$sex <- factor(clean.data$sex,  
+                       labels = c("Male", 
+                                  "Female", 
+                                  "Other"),
+                       levels = c(1,2,3))
+
+clean.data$race_ethnicity <- factor(clean.data$race_ethnicity,
+                             labels = c("Black", 
+                                        "White", 
+                                        "Hispanic or Latino",
+                                        "Asian",
+                                        "Native Hawaiian/Pacific Islander",
+                                        "American Indian/Alaska Native",
+                                        "Mixed",
+                                        "Other",
+                                        "Prefer not to say"),
+                             levels = c(1,2,3,4,5,6,7,8,9))
+
+clean.data$Political_Party <- factor(clean.data$Political_Party,  
+                       labels = c("Democrat", 
+                                  "Republican", 
+                                  "Independent",
+                                  "Other"),
+                       levels = c(1,2,3,4))
+
+clean.data <- clean.data%>% 
+  mutate(conservatismFactor = republican + conservative - democrat - liberal)
+
+clean.data$RelationshipStatus <- factor(clean.data$RelationshipStatus,  
+                       labels = c("Single", 
+                                  "In a Relationship", 
+                                  "Married",
+                                  "Widowed",
+                                  "Divorced",
+                                  "Other"),
+                       levels = c(1,2,3,4,5,6))
+
+clean.data$ReligionRaised <- factor(clean.data$ReligionRaised,  
+                       labels = c("Christianity", 
+                                  "Judaism", 
+                                  "Islam",
+                                  "Unitarian Universal",
+                                  "Buddhism",
+                                  "Hinduism",
+                                  "Agnosticism", 
+                                  "Athesism", 
+                                  "Humanism",
+                                  "Paganism",
+                                  "None",
+                                  "Other"),
+                       levels = c(1,2,3,4,5,6,7,8,9,10,11,12))
+
+clean.data$ReligionNow <- factor(clean.data$ReligionNow,  
+                       labels = c("Christianity", 
+                                  "Judaism", 
+                                  "Islam",
+                                  "Unitarian Universal",
+                                  "Buddhism",
+                                  "Hinduism",
+                                  "Agnosticism", 
+                                  "Athesism", 
+                                  "Humanism",
+                                  "Paganism",
+                                  "None",
+                                  "Other"),
+                       levels = c(1,2,3,4,5,6,7,8,9,10,11,12))
+
+clean.data$HumanMind <- factor(clean.data$HumanMind,
+                        labels = c("Computers", 
+                                  "Souls"),
+                        levels = c(0,1))
+clean.data$Optimize <- factor(clean.data$Optimize,
+                       labels = c("No", 
+                                  "Yes"),
+                       levels = c(0,1))
+
+clean.data$AttendChurch <- factor(clean.data$AttendChurch,  
+                       labels = c("Never", 
+                                  "Once a year or less", 
+                                  "A few times a year",
+                                  "A few times a month",
+                                  "Once a week",
+                                  "More than once a week"),
+                       levels = c(1,2,3,4,5,6))
+
+clean.data$ReligiousActivity <- factor(clean.data$ReligiousActivity,  
+                       labels = c("Never", 
+                                  "Once a year or less", 
+                                  "A few times a year",
+                                  "A few times a month",
+                                  "Once a week",
+                                  "More than once a week"),
+                       levels = c(1,2,3,4,5,6))
+
+clean.data$meditation <- factor(clean.data$meditation,  
+                       labels = c("Never", 
+                                  "Once a year or less", 
+                                  "A few times a year",
+                                  "A few times a month",
+                                  "Once a week",
+                                  "More than once a week"),
+                       levels = c(1,2,3,4,5,6))
+
+clean.data$Religiosity <- factor(clean.data$Religiosity,  
+                       labels = c("Not Religious", 
+                                  "Somewhat Religious", 
+                                  "Very Religious",
+                                  "Extremely Religious"),
+                       levels = c(1,2,3,4))
+
+clean.data$Spirituality <- factor(clean.data$Spirituality,  
+                       labels = c("Not Spiritual", 
+                                  "Somewhat Spiritual", 
+                                  "Very Spiritual",
+                                  "Extremely Spiritual"),
+                       levels = c(1,2,3,4))
+```
+
+```{r merging cleaned survey and task data}
+clean.data %>% 
+  mutate(condition = factor(clean.data$condition), 
+         experimental_treatment_selected = as.integer(clean.data$experimental_treatment_selected)) %>%
+    group_by(user_id) %>% 
+    mutate(cor_pearson = cor(risk, gain),
+            N = n(),
+            Yes = sum(experimental_treatment_selected),
+            No = N - Yes) %>% 
+    ungroup() %>% 
+  mutate(experimental_treatment_selected = factor(clean.data$experimental_treatment_selected, labels = c("No to treatment","Yes to treatment"))) -> clean.data
+#how long did they take?
+# clean.data %>% 
+#   filter(trial_index == 229) %>% 
+#   mutate(time_elapsed = time_elapsed/60000) %>% 
+#   summarise(n = n(),
+#             mean = mean(time_elapsed),
+#             sd = sd(time_elapsed),
+#             se = sd / sqrt(n),
+#             ci = qt(0.975, df = n - 1) * sd / sqrt(n))
+
+Neuroethics_Judgement = clean.data
+
+#write.csv(Neuroethics_Judgement, file = paste("../data/Cleaned_Pilot/cleaned.csv"))
+
+
+#write.csv(Neuroethics_Judgement,paste("../data/Cleaned_Pilot/",'eda.csv',sep = ""))
+#save(Neuroethics_Judgement, file = paste("../data/Cleaned_Pilot/clean.data.2020.10.2.RData"))
+```
+
+
+```{r get betas for within subject models, eval=FALSE, include=FALSE}
+source(here("ext", "get_betas.R"))
+source(here("ext", "get_pvalues.R"))
+
+clean.data %>% 
+  dplyr::select(user_id,risk,gain,experimental_treatment_selected) %>% 
+  group_by(user_id) %>% 
+  mutate(risk.c = scale(risk, scale = F)) %>% #center the variables
+  mutate(gain.c = scale(gain, scale = F)) %>% 
+  mutate(treatment = ifelse(experimental_treatment_selected == "Yes to treatment", 1, 0)) -> logit.data 
+
+subjectModels <- get_betas(logit.data, treatment ~ risk.c + gain.c)
+
+colnames(subjectModels) <-  c("user_id", "risk", "gain", "experimental_treatment_selected", "risk.centered", "gain.centered", "treatment", "(Intercept)", "Risk_Beta", 
+"Gain_Beta", "risk_vif", "gain_vif", "vif_exclusion", "null.deviance", 
+"df.null", "logLik", "AIC", "BIC", "deviance", "df.residual", 
+"nobs")
+
+subjectModels %>% 
+ dplyr::select("user_id","(Intercept)", "Risk_Beta", 
+"Gain_Beta", "risk_vif", "gain_vif", "vif_exclusion", "null.deviance", 
+"df.null", "logLik", "AIC", "BIC", "deviance", "df.residual", 
+"nobs") %>% 
+  distinct() %>% 
+  mutate(R.cs = 1- exp ( -(null.deviance - deviance) / nobs),
+         Nagelkerke_R2 = R.cs / ( 1 - ( exp (-(null.deviance / nobs))))) -> subjectModels.r2
+
+subjectModels.r2 %>%   
+  group_by(user_id) %>% 
+  filter(!Nagelkerke_R2 == -Inf) %>% 
+  filter(!Nagelkerke_R2 <= quantile(subjectModels.r2$Nagelkerke_R2, .05)) %>% 
+  nest() -> subjectModels 
+colnames(subjectModels) = c("user_id", "logit_models")
+
+
+Neuroethics_Judgement <-  merge(clean.data, subjectModels, "user_id")
+```
+
+```{r marginal effects, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+#calculate average marginal effects
+source(here("ext", "get_marginal.R"))
+
+marginal = get_marginal(logit.data, treatment ~ risk.c + gain.c)
+marginal %>% 
+  dplyr::select(c("user_id","risk_average_marginal_effect", 
+"risk_Std_Err", "risk_z", "risk_P>|z|", "gain_average_marginal_effect", 
+"gain_Std_Err", "gain_z", "gain_P>|z|")) %>% 
+  distinct() %>% 
+  group_by(user_id) %>% 
+  nest() -> marginal
+colnames(marginal) = c("user_id", "marginal")
+
+Neuroethics_Judgement <-  merge(Neuroethics_Judgement, marginal, "user_id")
+```
+
+```{r}
+#cols = c(scores, logit_models, marginal) instead if used
+Neuroethics_Judgement %>% 
+  unnest(cols = c(scores), 
+         names_repair = "unique") -> data_set
+write.csv(data_set, file = paste("../data/Cleaned_Pilot/clean_data_longV2.csv"))
+```

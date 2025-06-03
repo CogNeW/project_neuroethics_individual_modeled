@@ -1,0 +1,39 @@
+---
+title: "RTExclusions"
+output: html_document
+date: "2024-04-17"
+---
+
+```{r}
+library(dplyr)
+```
+
+
+```{r}
+base_dir = "C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS"
+behavior_path = paste(base_dir, "/data/Cleaned_Pilot/exclusions.2020.10.21.Rdata", sep="")
+load(behavior_path)
+```
+
+
+```{r}
+risk_data <- Neuroethics_Judgement %>% 
+  filter(!rt <= 250) %>% #before or after the intial cutoff
+  filter(!rt >= 9000) %>% 
+  group_by(user_id) %>% 
+  mutate(Q1 = quantile(rt, .25),
+         Q3 = quantile(rt, .75),
+         IQR = IQR(rt)) %>% 
+  filter(rt > (Q1 - 2*IQR) & rt < (Q3 + 2*IQR)) %>% 
+  group_by(user_id) %>%
+  # mutate(
+  #   risk = scale(risk),
+  #   gain = scale(gain)
+  # ) %>%
+  ungroup()
+```
+
+```{r}
+save(risk_data, file = "FINAL_RT_EXCLUDED_DATA_20240417.RData")
+```
+

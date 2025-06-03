@@ -1,0 +1,162 @@
+---
+title: "Mixed_Model_Logisitc_Regression"
+author: "Kianté Fernandez"
+date: "2/11/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(reshape2)
+library(lme4)
+library(lmerTest)
+library(doParallel)
+library(patchwork)
+#library(DHARMa) 
+library(afex)
+```
+
+```{r load data}
+Neuroethics_Judgement <- read.csv(here::here("data", "Cleaned_Pilot", "clean_data_longV2.csv"), stringsAsFactors=TRUE) %>% 
+  select(user_id, condition, risk, gain, no_effect, experimental_treatment_selected, Yes, No, age, sex, Income, education, race_ethnicity) %>% 
+   mutate(experimental_treatment_selected = ifelse(experimental_treatment_selected == "Yes to treatment", 1, 0), trials = Yes + No)-> data
+
+continuous <- c("risk", "gain","no_effect", "age")
+
+#within subject scaling
+data <- data %>% 
+  group_by(user_id) %>%
+  mutate(risk = scale(risk),
+         gain = scale(gain)) %>% 
+  ungroup()
+```
+
+```{r}
+p1 <- data %>% ggplot(aes(risk, fill = condition)) + geom_histogram(bins = 8, color  = "black",  fill="#ee7c2e") + theme_minimal()+
+  facet_wrap(~ experimental_treatment_selected)
+  
+p2 <- data %>% ggplot(aes(gain)) + geom_histogram(bins = 9, color  = "black", fill="#4673c3") + theme_minimal()+  facet_wrap(~experimental_treatment_selected)
+p1 + p2
+
+data %>% ggplot(aes(risk, fill = condition)) + geom_density(color  = "black",  fill="#ee7c2e") + theme_minimal()+
+  facet_wrap(~ experimental_treatment_selected)
+data %>% ggplot(aes(gain, fill = condition)) + geom_density(color  = "black",  fill="#4673c3") + theme_minimal()+
+  facet_wrap(~ experimental_treatment_selected)
+```
+
+```{r build model}
+# doParallel::registerDoParallel() #use parallel processing
+#start with risk, and gain
+cl <- makeCluster(4)
+clusterEvalQ(cl, require(lme4))
+m.1 <- glmer(experimental_treatment_selected ~ 1 + risk + gain +
+               I(risk^2) + I(gain^2) +
+                risk:gain +
+                risk:I(gain^2) +
+                gain:I(risk^2) +
+               I(gain^2):I(risk^2) +
+             (1 + risk + gain | user_id), 
+             data = data, family = binomial(link="logit"), 
+             control=glmerControl(optimizer="bobyqa"),
+             nAGQ = 0)
+stopCluster(cl)
+
+se <- sqrt(diag(vcov(m.1)))
+# table of estimates with 95% CI
+(tab <- cbind(Est = fixef(m.1), LL = fixef(m.1) - 1.96 * se, UL = fixef(m.1) + 1.96 * se))
+exp(tab)
+summary(m.1)
+broomExtra::glance(m.1)
+broomExtra::augment(m.1)
+broomExtra::tidy(m.1)
+ranef(m.1)
+fixef(m.1)
+getME(m.1, "theta")
+```
+
+```{r simulate data}
+sampler <- function(dat, clustervar, replace = TRUE, reps = 1) {
+    cid <- unique(dat[, clustervar[1]])
+    ncid <- length(cid)
+    recid <- sample(cid, size = ncid * reps, replace = TRUE)
+    if (replace) {
+        rid <- lapply(seq_along(recid), function(i) {
+            cbind(NewID = i, RowID = sample(which(dat[, clustervar] == recid[i]),
+                size = length(which(dat[, clustervar] == recid[i])), replace = TRUE))
+        })
+    } else {
+        rid <- lapply(seq_along(recid), function(i) {
+            cbind(NewID = i, RowID = which(dat[, clustervar] == recid[i]))
+        })
+    }
+    dat <- as.data.frame(do.call(rbind, rid))
+    dat$Replicate <- factor(cut(dat$NewID, breaks = c(1, ncid * 1:reps), include.lowest = TRUE,
+        labels = FALSE))
+    dat$NewID <- factor(dat$NewID)
+    return(dat)
+}
+cl <- makeCluster(4)
+doParallel::registerDoParallel(cl) #use parallel processing
+
+set.seed(20)
+tmp <- sampler(data, "user_id", reps = 1000)
+bigdata <- cbind(tmp, data[tmp$RowID, ])
+doParallel::stopImplicitCluster(cl)
+```
+
+
+```{r set specifications}
+f <- fixef(m.1)
+r <- getME(m.1, "theta")
+
+cl <- makeCluster(4)
+clusterExport(cl, c("bigdata", "f", "r"))
+clusterEvalQ(cl, require(lme4))
+```
+
+```{r bootstrap}
+myboot <- function(i) {
+    object <- try(glmer(experimental_treatment_selected ~ 1 + cor_pearson + risk + gain  + I(risk^2) + I(gain^2) +
+                risk:gain +
+                risk:I(gain^2) +
+                gain:I(risk^2) + 
+             (1 + risk + gain + I(risk^2) + I(gain^2)| user_id), 
+             data = bigdata, subset = Replicate == i, family = binomial(link="logit"), 
+             control=glmerControl(optimizer="bobyqa"),
+             nAGQ = 1, start = list(fixef = f, theta = r)), silent = TRUE)
+    if (class(object) == "try-error")
+        return(object)
+    c(fixef(object), getME(object, "theta"))
+}
+```
+
+```{r}
+start <- proc.time()
+res <- parLapplyLB(cl, X = levels(bigdata$Replicate), fun = myboot)
+end <- proc.time()
+
+# shut down the cluster
+stopCluster(cl)
+```
+
+```{r}
+# calculate proportion of models that successfully converged
+success <- sapply(res, is.numeric)
+mean(success)
+```
+
+```{r}
+# combine successful results
+bigres <- do.call(cbind, res[success])
+
+# calculate 2.5th and 97.5th percentiles for 95% CI
+(ci <- t(apply(bigres, 1, quantile, probs = c(0.025, 0.975))))
+
+# All results
+finaltable <- cbind(Est = c(f, r), SE = c(se, NA), BootMean = rowMeans(bigres),
+    ci)
+# round and print
+round(finaltable, 3)
+```
+

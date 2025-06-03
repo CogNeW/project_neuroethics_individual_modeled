@@ -1,0 +1,382 @@
+---
+title: "Power_analysis"
+author: "Kianté Fernandez"
+date: "9/8/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r load libraries, include=FALSE}
+library(tidyverse)
+library(pwr)
+library(Superpower) # Daniël Lakens power package
+#devtools::install_github("arcaldwell49/Superpower") #to get his package
+library(knitr)
+library(kableExtra)
+```
+
+Here we are looking at the 320 subject (24 removed from VIF above 4)
+```{r load data, include=FALSE}
+load("clean_task_data.2020.09.14.RData")
+# Disable scientific notation
+options(scipen=999)
+```
+
+
+
+```{r between-subjects design, eval=FALSE, include=FALSE}
+data %>%
+ #filter(!dominate == "dominate") %>% 
+  filter(!user_id == "RU3gTWzp") %>% #we only have a single subject with less than a high school degee
+  mutate(education_recode = fct_recode(education,
+  HighSchool = "high school degree",
+  Undergraduate = "bachelor",
+  Postgraduate = "masters",
+  Postgraduate = "Doctoral/Professional")) %>% 
+  group_by(condition, education_recode) %>%
+  summarize(n = n(),
+         mean = mean(Risk_Beta),
+         sd = sd(Risk_Beta),
+         se = sd / sqrt(n),
+         ci = qt(0.975, df = n - 1) * sd / sqrt(n)) %>% na.omit() ->edu
+
+data %>%
+  #filter(!dominate == "dominate") %>% 
+  group_by(condition) %>%
+  summarize(n = n(),
+         mean = mean(Risk_Beta),
+         sd = sd(Risk_Beta),
+         se = sd / sqrt(n),
+         ci = qt(0.975, df = n - 1) * sd / sqrt(n)) %>% na.omit() ->X
+knitr::kable(X)
+    
+
+string <- "2b*3b"
+n <- 191  
+
+mu <- c(mean(X$mean),X$mean[4], edu$mean[11], 
+        mean(X$mean),X$mean[6], edu$mean[17]) #pattern of means
+
+sd <- mean(X$sd)
+
+r <- 0.0
+labelnames <- c("Domain", "Mood", "Executive function", 
+                "Population", "Patients", "Public", "Experts") 
+
+alpha_level = 0.05
+design_result <- ANOVA_design(design = string,
+                   n = n, 
+                   mu = mu, 
+                   sd = sd, 
+                   labelnames = labelnames)
+```
+
+```{r exact, eval=FALSE, include=FALSE}
+exact_result <- ANOVA_exact(design_result,
+                            alpha_level = alpha_level,
+                            verbose = FALSE)
+knitr::kable(exact_result$main_results, caption = "Exact Results") %>%  
+  kable_styling(latex_options = "hold_position")
+
+simulation_result <- ANOVA_power(design_result,
+                             alpha_level = alpha_level,
+                             verbose = FALSE,
+                             emm = F,
+                             contrast_type = "pairwise",
+                             emm_p_adjust = "holm", #mutiple comparisons adjust
+                             nsims = 1000, #set total number of simulations 
+                             seed = 235353) #set seed for reproducibility
+
+knitr::kable(simulation_result$main_results, caption = "Simulated Results") %>%  
+  kable_styling(latex_options = "hold_position")
+knitr::kable(simulation_result$pc_results, caption = "Pairwise comparisons Simulated Results") %>%  
+  kable_styling(latex_options = "hold_position")
+```
+
+
+
+```{r power tables, eval=FALSE, include=FALSE}
+#calculate optimal n for 90% power given what we observed
+plot_power(design_result, min_n = 40, max_n = 250,   desired_power = 80)
+```
+
+
+
+Here is the power analysis for education from lit
+```{r what we find in lit, eval=FALSE, include=FALSE}
+#what we find in the lit
+
+
+f2 <- 0.06179656
+ES <- f2 / (f2 + 1)
+mu <- mu_from_ES(K = 3, ES = ES)
+
+#
+string <- "3b"
+n <- 5277
+mu = mu
+sd = 1
+r <- -0.0554
+labelnames <- c("Education", "HighSchool","Undergraduate","Postgraduate") 
+alpha_level = 0.05
+design_result <- ANOVA_design(design = string,
+                   n = n, 
+                   mu = mu, 
+                   sd = sd, 
+                   labelnames = labelnames)
+
+exact_result <- ANOVA_exact(design_result,
+                            alpha_level = alpha_level,
+                            verbose = FALSE)
+
+knitr::kable(exact_result$main_results, caption = "Exact Results") %>%  
+  kable_styling(latex_options = "hold_position")
+
+plot_power(design_result, min_n = 30, max_n = 200,   desired_power = 80)
+```
+
+```{r sex}
+#Miller, A. S., & Hoffmann, J. P. (1995). Risk and Religion: An Explanation of Gender Differences in Religiosity. Journal for the Scientific Study of Religion, 34(1), 63–75. JSTOR. https://doi.org/10.2307/1386523
+
+
+mu = c(6.84, 5.49)
+    
+string <- "2b"
+n <- 2408
+mu = mu
+sd = c(2.27, 2.38)
+r <- 0
+labelnames <- c("Sex", "Male","Female") 
+alpha_level = 0.05
+design_result <- ANOVA_design(design = string,
+                   n = n, 
+                   mu = mu, 
+                   sd = sd, 
+                   labelnames = labelnames)
+
+exact_result <- ANOVA_exact(design_result,
+                            alpha_level = alpha_level,
+                            verbose = FALSE)
+
+knitr::kable(exact_result$main_results, caption = "Exact Results") %>%  
+  kable_styling(latex_options = "hold_position")
+
+plot_power(design_result, min_n = 30, max_n = 200,   desired_power = 90)
+```
+
+
+```{r eval=FALSE, include=FALSE}
+#Choma, B. L., Hanoch, Y., Hodson, G., & Gummerum, M. (2014). Risk Propensity Among Liberals and Conservatives: The Effect of Risk Perception, Expected Benefits, and Risk Domain. Social Psychological and Personality Science. https://doi.org/10.1177/1948550613519682
+
+#mu = c(3.01, 5.49)
+    
+string <- "2b"
+n <- 396
+mu = mu
+sd = c(1.13)
+r <- -.02
+labelnames <- c("Political", "Conservatism","Liberalism") 
+alpha_level = 0.05
+design_result <- ANOVA_design(design = string,
+                   n = n, 
+                   mu = , 
+                   sd = sd, 
+                   labelnames = labelnames)
+
+exact_result <- ANOVA_exact(design_result,
+                            alpha_level = alpha_level,
+                            verbose = FALSE)
+
+knitr::kable(exact_result$main_results, caption = "Exact Results") %>%  
+  kable_styling(latex_options = "hold_position")
+
+plot_power(design_result, min_n = 30, max_n = 200,   desired_power = 90)
+```
+
+```{r individual differences in education, eval=FALSE, include=FALSE}
+data %>%
+  filter(!dominate == "dominate") %>% 
+  filter(!user_id == "RU3gTWzp") %>% #we only have a single subject with less than a high school degee
+  mutate(education_recode = fct_recode(education,
+  HighSchool = "high school degree",
+  Undergraduate = "bachelor",
+  Postgraduate = "masters",
+  Postgraduate = "Doctoral/Professional")) %>% 
+  group_by(education_recode) %>%
+  summarize(n = n(),
+         mean = mean(Risk_Beta),
+         sd = sd(Risk_Beta),
+         se = sd / sqrt(n),
+         ci = qt(0.975, df = n - 1) * sd / sqrt(n)) %>% na.omit() ->edu
+
+mu <- c(edu$mean[1], edu$mean[2], edu$mean[3])
+sd <- mean(edu$sd)
+#f <- sqrt(sum((mu - mean(mu)) ^ 2) / length(mu)) / sd 
+
+#our data
+string <- "3b"
+n <- 320
+mu = mu
+sd = sd
+r <- 0.0
+labelnames <- c("Education", "HighSchool","Undergraduate","Postgraduate") 
+alpha_level = 0.05
+design_result <- ANOVA_design(design = string,
+                   n = n, 
+                   mu = mu, 
+                   sd = sd, 
+                   labelnames = labelnames)
+
+exact_result <- ANOVA_exact(design_result,
+                            alpha_level = alpha_level,
+                            verbose = FALSE)
+
+knitr::kable(exact_result$main_results, caption = "Exact Results") %>%  
+  kable_styling(latex_options = "hold_position")
+
+plot_power(design_result, min_n = 40, max_n = 400,   desired_power = 80)
+
+```
+
+```{r simulation, eval=FALSE, include=FALSE}
+
+monte_result1 <- ANOVA_power(design_result,
+                             alpha_level = alpha_level,
+                             verbose = FALSE,
+                             emm = F,
+                             contrast_type = "pairwise",
+                             emm_p_adjust = "holm", #mutiple comparisons adjust
+                             nsims = 10000, #set total number of simulations 
+                             seed = 235353) #set seed for reproducibility
+
+```
+
+```{r archive, eval=FALSE, include=FALSE}
+
+K <- 3 
+n <- 200
+sd <- sd
+r <- 0
+#Calculate f when running simulation
+f <- pwr.anova.test(n = n,
+                    k = K,
+                    power = 0.8,
+                    sig.level = alpha_level)$f
+f
+
+f2 <- f^2
+ES <- f2 / (f2 + 1)
+ES
+
+## Medium effect size (eta-squared), 3 groups
+
+mu <- mu_from_ES(K = 3, ES = ES)
+mu <- mu * sd
+mu
+```
+
+```{r eval=FALSE, include=FALSE}
+
+data <-  merge(data, XXX, "user_id")
+
+mu <- c(-0.004336207,  0.000000000,  0.004336207, #1st  ECT Mood Patients       2nd  ECT Mood Public        3rd ECT Mood Experts
+        -0.004336207,  0.000000000,  0.004336207, #4th  ECT Executive Patients  5th  ECT Executive Public   6th ECT Executive Experts
+        -0.004336207,  0.000000000,  0.004336207,  #7th  ECT Memory Patients     8th  ECT Memory Public      9th ECT Memory Experts
+        
+        -0.004336207,  0.000000000,  0.004336207, #10th TMS Mood Patients       11th TMS Mood Public       12th TMS Mood Experts
+        -0.004336207,  0.000000000,  0.004336207, #13th TMS Executive Patients  14th TMS Executive Public  15th TMS Executive Experts
+        -0.004336207,  0.000000000,  0.004336207,  #16th TMS Memory Patients     17th TMS Memory Public     18th TMS Memory Experts
+        
+        -0.004336207,  0.000000000,  0.004336207, #19th tDCS Mood Patients      20th tDCS Mood Public      21st tDCS Mood Experts
+        -0.004336207,  0.000000000,  0.004336207, #22nd tDCS Executive Patients 23rd tDCS Executive Public 24th tDCS Executive Experts
+        -0.004336207,  0.000000000,  0.004336207  #25th tDCS Memory Patients    26th tDCS Memory Public    27th tDCS Memory Experts
+        ) #pattern of means
+
+mu[1:9]   <- mu[1:9]    + -0.003783631 #ECT 
+mu[10:18] <- mu[10:18]  +  0.000000000 #TMS 
+mu[19:27] <- mu[19:27]  +  0.003783631 #tDCS
+
+mu[c(1,2,3,10,11,12,19,20,21)] <- mu[c(1,2,3,10,11,12,19,20,21)] + -0.004336207#Mood
+mu[c(4,5,6,13,14,15,22,23,24)] <- mu[c(4,5,6,13,14,15,22,23,24)] +  0.000000000#Executive
+mu[c(7,8,9,16,17,18,25,26,27)] <- mu[c(7,8,9,16,17,18,25,26,27)] +  0.004336207#Memory
+
+
+```
+
+```{r eval=FALSE, include=FALSE}
+pwr2ppl::anova1f_3(m1 = edu$mean[1], m2 = edu$mean[2], m3 = edu$mean[3],
+          s1 = edu$sd[1], s2 = edu$sd[2], s3 = edu$sd[3],
+          n1 = edu$n[1], n2 = edu$n[2], n3 = edu$n[3],
+          alpha = .05)
+
+
+exact_result <- ANOVA_exact(design_result,
+                            alpha_level = alpha_level,
+                            verbose = FALSE)
+
+knitr::kable(exact_result$main_results, caption = "Exact Results") %>%  
+  kable_styling(latex_options = "hold_position")
+
+
+simulation_result <- ANOVA_power(design_result, 
+                                 alpha_level = alpha_level, 
+                                 nsims = 1000,
+                                 verbose = FALSE)
+knitr::kable(simulation_result$main_results, caption = "Simulated Results") %>%  
+  kable_styling(latex_options = "hold_position")
+
+plot_power(design_result, min_n = 10, max_n = 200,   desired_power = 80)
+
+
+K <- 3
+
+f <- res$f
+f2 <- f^2
+ES <- f2 / (f2 + 1)
+ES
+
+mu <- mu_from_ES(K = K, ES = ES)
+
+#Cohen, 1988, formula 8.2.1 and 8.2.2
+sqrt(sum((mu - mean(mu)) ^ 2) / length(mu)) / sd 
+```
+
+
+```{r eval=FALSE, include=FALSE}
+calc_f_d_eta <- function(mu, sd, variability){
+  if (variability == "minimum") {
+    k = length(mu)
+    d <- (max(mu) - min(mu)) / sd
+    f <- d * sqrt(1 / (2 * k))
+    f2 <- f ^ 2
+    ES <- f2 / (f2 + 1)
+  }
+  if (variability == "medium") {
+    k = length(mu)
+    d <- (max(mu) - min(mu)) / sd
+    f <- (d / 2) * sqrt((k + 1) / (3 * (k - 1)))
+    f2 <- f ^ 2
+    ES <- f2 / (f2 + 1)
+  }
+  if (variability == "maximum") {
+    k = length(mu)
+    d <- (max(mu) - min(mu)) / sd
+    f <- ifelse(k %% 2 == 0, .5 * d, d * (sqrt(k ^ 2 - 1) / (2 * k)))
+    f2 <- f ^ 2
+    ES <- f2 / (f2 + 1)
+  }
+  invisible(list(mu = mu,
+                 sd = sd,
+                 d = d,
+                 f = f,
+                 f2 = f2,
+                 ES = ES))
+}
+res <- calc_f_d_eta(mu = mu, sd = sd, variability = "medium")
+res$f
+```
+

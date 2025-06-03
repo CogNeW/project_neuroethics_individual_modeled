@@ -1,0 +1,174 @@
+---
+title: "Subject-wise Quality Check"
+author: "Kianté A. Fernandez"
+date: "3/31/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+library(tidyselect)
+library(magrittr)
+library(ggplot2)
+library(ggpubr)
+library(reshape)
+
+files <- list.files(path = "../data/mturk_data_first_50_subjs", pattern = "*.csv", full.names = T)
+pilot <- sapply(files, readr::read_csv, simplify=FALSE) 
+Mpilot = bind_rows(pilot)
+
+N = 75#Set the min number of trials
+n = 54#Set the number of subjects 
+cleanPilot = select_(Mpilot,"user_id","condition","total_trials","risk","gain","no_effect", "experimental_treatment_selected", "key_press", "rt")
+cleanPilot = na.omit(cleanPilot)
+cleanPilot = filter(cleanPilot, total_trials >= N)
+cleanPilot = mutate(cleanPilot, ratio = gain / risk)#Gain over Risk
+cleanPilot$ratio = round(cleanPilot$ratio,4)
+cleanPilot$condition = factor(cleanPilot$condition)
+
+trial_index = data_frame(rep.int(c(1:75), n)) #MAKE SURE THIS IS EQUAL TO THE NUMBER OF SUBJECTS
+colnames(trial_index)= c("trial_index")
+
+cleanPilot = cbind(cleanPilot,trial_index)
+cleanPilot$trial_index = factor(cleanPilot$trial_index)
+
+
+Neuroethics_Judgement = cleanPilot
+
+rm(Mpilot, pilot, files) #Clean up the environment
+source("../r_docs/Multiple_plot_function.R")
+```
+
+
+We want to know:
+
+**Only considering the task data, what are some characteristics that would make us skeptical of a set of observations from a given subject?**
+
+
+## Observation Counts
+
+Let’s start by taking a look at how many observations we have for each of the subjects.
+
+```{r Subject wise observation counts, echo=FALSE}
+
+datalist = list()
+for (i in Neuroethics_Judgement$user_id){
+  x = filter(Neuroethics_Judgement, user_id == i)
+  dat = table(x$experimental_treatment_selected) #Check Class bias
+  datalist[[i]] = dat # add it to your list
+}
+Observation_Counts = do.call(rbind, datalist)
+colnames(Observation_Counts) = c('No', 'Yes')
+View(Observation_Counts)
+rm(i, x,datalist, dat)
+print(Observation_Counts)
+summary(Observation_Counts)
+```
+
+This does not seem to tell us much. We can notice that some people have distributions that are quite asymmetrical, but we cannot see any particular reason that may explain these distributions. 
+
+
+## Response Time
+
+If we are only considering the task data, one of the first things we can look at is how long subjects took. Luckily, we gathered this data. 
+
+Let’s take a look at the distribution in a summary table first.
+
+```{r}
+RT = select_(cleanPilot, "rt")
+summary(RT)
+```
+
+Here **rt** represents the amount of time elapsed from stimulus onset (when the visual analog options appear) to when the subject makes a decision measured in milliseconds. 
+
+Let’s look at the extremes first:
+
+* Oddly, it seems like someone was able to answer at 0.00. This means that during this trial, a response was imputed faster than our measurement tool could record; sounds like we found a bot!
+
+* On the other end we have a trial that was over 45 mins. Seeing as we ask our subjects to respond quickly this looks like someone walked away from the task or something. 
+
+I am less confident that we can interpret the mean here given that our task does occur over time. So, we can account for this by grouping our data by trial. That way our nested observations are grouped by trial and we can visualize changes in average response time across subjects by trial.
+
+Here is a visualization of each trial's average response time before removing any of the potential bot data:
+
+```{r, echo=FALSE, warning=FALSE, fig.dim=c(12,4)}
+RT = select_(cleanPilot,"user_id", "rt", "trial_index")
+RT$user_id = factor(RT$user_id)
+
+data_long = melt(RT, 
+                 id=c("user_id","trial_index"),
+                 measure=c("rt"))
+ggplot(data_long, aes(trial_index, value)) +
+  stat_summary(fun = mean, geom = "line") +
+  stat_summary(fun.data=mean_se, geom = "pointrange") +
+  scale_y_continuous("RT (milliseconds)") +
+  labs(title="", 
+       subtitle="",
+       caption="",
+       x="Trial Number",
+       y="RT (milliseconds)")
+```
+
+On the x axis we have trials 1 to 75* and on the y axis we have average rt.  
+
+You can see outliers are really doing a number on what we are able to see here. However, it is clear that we do have some observations that are far too large.
+
+I did not want to make too many choices related to the lower bound, but it should not take anyone over a min per trial. So I will take some liberties for the sake of spotting some potential bots and set the bounds to 1min and 1/4th a second.
+
+```{r}
+cleanPilot = filter(cleanPilot, rt <= 60000 & rt >= 250)
+
+table(cleanPilot$user_id)
+
+```
+
+This is a sanity check that I am filtering trials. 
+
+Here you can see several subjects have lost so trials to these bounds we set. Let’s take a look at the data now without these subjects.
+
+```{r, echo=FALSE}
+#Remove Subjects who do not have 75 trials
+cleanPilot =subset(cleanPilot, with(cleanPilot, user_id %in% names(which(table(user_id)>=N)))) 
+
+table(cleanPilot$user_id)
+
+RT = select_(cleanPilot,"user_id", "rt", "trial_index")
+
+summary(RT)
+```
+Looks like we are at 44 subjects now. 
+
+Here the new plot:
+```{r, echo=FALSE, warning=FALSE, fig.dim=c(12,4)}
+RT = select_(cleanPilot,"user_id", "rt", "trial_index")
+RT$user_id = factor(RT$user_id)
+
+data_long = melt(RT, 
+                 id=c("user_id","trial_index"),
+                 measure=c("rt"))
+ggplot(data_long, aes(trial_index, value)) +
+  stat_summary(fun = mean, geom = "line") +
+  stat_summary(fun.data=mean_se, geom = "pointrange") +
+  scale_y_continuous("RT (milliseconds)") +
+  labs(title="", 
+       subtitle="",
+       caption="",
+       x="Trial Number",
+       y="RT (milliseconds)")
+```
+Just only looking at the visualization, we can already see what we expect: People take some time figuring out what is being asked and get faster over time. 
+
+
+
+##  Closing thoughts
+
+We could also look at key press behavior, though I am not sure how we would model this or learn who was bunk from this data other than a seeing someone only clicked one button the whole time (no one did).
+
+If we consider the first attention check, we knock off a few more and end with **39 subjects**
+
+Wrapping up here, we started with 50 observations and lost 11 after attention check number one and rt data bandpass. This means we lost 22 percent of subjects to 'attrition' from using Mturk. Something to consider is seeing how many, if any subjects we would lose on prolific.
+

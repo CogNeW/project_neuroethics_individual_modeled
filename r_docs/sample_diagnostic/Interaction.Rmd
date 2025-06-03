@@ -1,0 +1,68 @@
+---
+title: "Analysis ANOVA"
+author: "Kianté A. Fernandez"
+date: "3/25/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readr)
+library(dplyr)
+library(tidyselect)
+library(magrittr)
+library(ggplot2)
+library(ggpubr)
+
+files <- list.files(path = "../data/mturk_data_first_50_subjs", pattern = "*.csv", full.names = T)
+pilot <- sapply(files, readr::read_csv, simplify=FALSE) 
+Mpilot = bind_rows(pilot)
+
+N = 75 #Set the min number of trials
+cleanPilot = select_(Mpilot,"user_id","condition","total_trials","risk","gain","no_effect", "experimental_treatment_selected")
+cleanPilot = na.omit(cleanPilot)
+cleanPilot = filter(cleanPilot, total_trials >= N)
+cleanPilot = mutate(cleanPilot, ratio = gain / risk)
+cleanPilot$ratio = round(cleanPilot$ratio,4)
+cleanPilot$condition = factor(cleanPilot$condition)
+Neuroethics_Judgement = cleanPilot
+
+rm(Mpilot, pilot, files, cleanPilot) #Clean up the environment
+source("../r_docs/Multiple_plot_function.R")
+```
+
+Lets start by estimating the two models, one with the interaction term, another without. 
+
+```{r warning=FALSE}
+mod3 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk + gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+mod4 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ risk + gain + risk*gain, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+mod5 = by(Neuroethics_Judgement, Neuroethics_Judgement$user_id, function(x) glm(experimental_treatment_selected ~ ratio, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+
+```
+Here I will pick out a subject with a significant interaction for demonstration purposes. 
+```{r}
+summary(mod3$nB8WmX4K)
+summary(mod4$nB8WmX4K)
+summary(mod5$nB8WmX4K)
+
+```
+**Does the effect that the probability of worsening a deficit have on the odds of an experimental treatment option being chosen depend on the probability of curing a deficit?**
+&
+**Is there a signifiant difference in our models when comparing a risk and gain model to that of a ratio model?**
+
+```{r}
+anova(mod3$nB8WmX4K, mod4$nB8WmX4K, test="Chisq")
+anova(mod3$nB8WmX4K, mod5$nB8WmX4K, test="Chisq")
+
+```
+
+####Interpretation of interaction model
+
+Based on the model fit, we determine there is a significant interaction between risk and gain and can assume assume (at least for this subject) that risks effect on choosing an experimental treatment is dependent on the amoung of gain. 
+
+Further for our second findings, while showing a change in the residual deviance, we fail to reject the null within this particular subject.
+
+
+
+For more information about subjects and to play with the code yourself, [go check out the github repo](https://github.com/kiante-fernandez/RiskBenefit_Neuroethics)! 

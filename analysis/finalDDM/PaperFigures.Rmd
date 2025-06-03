@@ -1,0 +1,1295 @@
+---
+title: "PaperFigures"
+output: html_document
+date: "2024-09-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+For the results portion, we should also report the DIC values.
+
+M0 (without time effect)
+DIC: 51833.97
+WAIC: 55526.92 (SE: 351.70)
+LOO: 56106.64 (SE: 357.57)
+
+M1 (with time effect)
+
+DIC: 51644.23
+WAIC: 55261.85 (SE: 354.88)
+LOO: 55831.44 (SE: 360.99)
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(tidybayes) # Tidy Data and 'Geoms' for Bayesian Models, CRAN v3.0.2
+library(ggdist) # Visualizations of Distributions and Uncertainty, CRAN v3.0.1
+library(patchwork)
+library(reshape2)
+```
+
+
+# Load Correct Files
+
+```{r}
+# load("C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM/predictions.RData")
+# load("C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM/NeuroethicsPosterior.RData")
+load("C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM/NeuroethicsPosteriorAndPredictions.RData")
+```
+
+```{r}
+behavior_path <- "C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/data/FINAL_RT_EXCLUDED_DATA_20241014.RData"
+load(behavior_path)
+
+behavior_path <- "C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM/participant_responses_20241216.RData"
+load(behavior_path)
+
+final_participant_path <- "C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM/FINAL_PARTICIPANT_LIST.RData"
+load(final_participant_path)
+
+# Data preprocessing
+risk_data <- risk_data %>%
+  mutate(
+    rt = rt / 1000, # Convert reaction time to seconds
+    response = ifelse(experimental_treatment_selected == "Yes to treatment", 1, 0),
+    RT = if_else(response == 0, -rt, rt), # Negative RT for 'No' responses
+    risk = risk * 0.01, # Convert percentages to proportions
+    gain = gain * 0.01,
+    no_effect = no_effect * 0.01,
+    idxP = as.numeric(as.factor(user_id)) # Create numeric subject index
+  ) 
+
+risk_data <- risk_data %>%
+  filter(idxP %in% unique_idxP_table$idxP)
+```
+
+
+# Load Data
+
+```{r}
+observed_data <- risk_data %>% select(RT)
+```
+
+
+# Figure 1 (PPC)
+
+```{r}
+create_ppc_plot <- function(predictions, observed_data, model_name) {
+  predicted_data <- tibble(
+    RT = as.vector(predictions),
+    draw = rep(1:ncol(predictions), each = nrow(predictions))
+  )
+
+  ggplot() +
+  # Predicted (average) - red line for predicted
+  stat_density(
+    data = predicted_data, aes(x = abs(RT), color = "Predicted"),
+    geom = "line", position = "identity", linewidth = 1, linetype = "solid"
+  ) +
+  # Observed - black line for observed
+  stat_density(
+    data = observed_data, aes(x = abs(RT), color = "Observed"),
+    geom = "line", position = "identity", linewidth = 1, linetype = "solid"
+  ) +
+  labs(
+    title = paste("Posterior Predictive Check:", model_name),
+    x = "Response Time (seconds)",
+    y = "Density",
+    color = "Legend"  # Label for the legend
+  ) +
+  scale_color_manual(values = c("Predicted" = "red", "Observed" = "black")) +  # Define colors in the legend
+  theme_tidybayes() +
+  theme(
+    axis.title = element_text(size = 24),  # Increase font size for axis labels
+    axis.text = element_text(size = 18),    # Adjust tick label size
+    plot.title = element_text(size = 24, face = "bold", family = "serif"),  # Increase title font size
+    text = element_text(family = "serif"),  # Set the overall plot font to serif
+    legend.position = "right",  # Position the legend to the right (can change to "top", "bottom", etc.)
+    legend.box = "box",  # Put the legend inside a box
+    legend.background = element_rect(color = "black"),
+    legend.text = element_text(size = 18),  # Increase the legend text size
+    legend.title =  element_blank()
+  ) +
+  scale_x_continuous(limits = c(0, 7.5)) +
+    scale_y_continuous(limits=c(0, 2.0))
+
+ 
+}
+
+
+```
+
+```{r}
+m0_ppc_plot <- create_ppc_plot(m0_predictions, observed_data, "M0 (without time effect)")
+m1_ppc_plot <- create_ppc_plot(m1_predictions, observed_data, "M1 (with time effect)")
+print(m0_ppc_plot)
+print(m1_ppc_plot)
+```
+
+
+```{r}
+# Assuming m0_ppc_plot and m1_ppc_plot are your existing plots
+# Add individual titles for each plot
+m0_ppc_plot <- m0_ppc_plot + ggtitle("Model without Time Effect") +
+  theme(
+    legend.position = "none"                 # Remove legend for the left plot
+  )
+m1_ppc_plot <- m1_ppc_plot + ggtitle("Model with Time Effect")
+
+# Combine the two plots side by side with patchwork
+combined_plot <- m0_ppc_plot + m1_ppc_plot + 
+  plot_layout(ncol = 2) &  # Set layout for two columns
+  theme(plot.title = element_text(size = 28, face = "bold", family="serif", hjust = 0.5))  # Title size for sub-plots
+
+# Add a common title for the combined plot
+combined_plot <- combined_plot + plot_annotation(
+  title = "Posterior Predictive Plots",
+  theme = theme(
+    plot.title = element_text(size = 32, face = "bold", family="serif", hjust = 0.5)  # Set the size and style of the main title
+  )
+)
+
+```
+
+
+```{r}
+# Set up a new plotting device with larger width
+dev.new(width = 24, height = 8)
+print(combined_plot)
+
+# Optionally, save the plot with increased width
+ggsave("Figures/Fig1_PPC_RT_DISTRIBUTION.png", combined_plot, width = 16, height = 8)
+```
+
+
+# Figure 2 (Gain and Risk Predictions)
+
+```{r}
+# Create a comparison plot with overlaid data
+create_comparison_plot_rt <- function(observed_data, predicted_data, x_var, y_var, x_label, y_label, y_limits = NULL, convert_predicted_to_seconds = FALSE) {
+  observed_summary <- observed_data %>%
+    mutate({{ x_var }} := {{ x_var }} * 100) %>%
+    group_by({{ x_var }}, experimental_treatment_selected) %>%
+    summarise(
+      m_left = mean({{ y_var }}),
+      se = sqrt(var({{ y_var }}) / n()),
+      .groups = "drop"
+    )
+  
+  predicted_summary <- predicted_data %>%
+    mutate({{ x_var }} := {{ x_var }} * 100) %>%
+    group_by({{ x_var }}, experimental_treatment_selected) %>%
+    summarise(
+      m_left = if (convert_predicted_to_seconds) mean({{ y_var }}) / 1000 else mean({{ y_var }}),
+      se = if (convert_predicted_to_seconds) sqrt(var({{ y_var }})) / (1000 * sqrt(n())) else sqrt(var({{ y_var }}) / n()),
+      .groups = "drop"
+    )
+
+  plot <- ggplot() +
+    geom_pointrange(
+      data = observed_summary,
+      aes(x = {{ x_var }}, y = m_left, ymin = m_left - 1.96 * se, ymax = m_left + 1.96 * se, color = "Observed", shape = experimental_treatment_selected)
+    ) +
+    geom_line(data = observed_summary, aes(x = {{ x_var }}, y = m_left, color = "Observed", shape = experimental_treatment_selected, linetype = experimental_treatment_selected), size = 0.6) +
+    geom_pointrange(
+      data = predicted_summary,
+      aes(x = {{ x_var }}, y = m_left, ymin = m_left - 1.96 * se, ymax = m_left + 1.96 * se, color = "Predicted", shape = experimental_treatment_selected)
+    ) +
+    geom_line(data = predicted_summary, aes(x = {{ x_var }}, y = m_left, color = "Predicted", shape = experimental_treatment_selected, linetype = experimental_treatment_selected), size = 0.6) +
+    theme_classic() +
+    geom_smooth(data=observed_summary, aes(x = {{ x_var }}, y = m_left), method="lm") +
+    geom_smooth(data=predicted_summary, aes(x = {{ x_var }}, y = m_left), method="lm") +
+    # geom_hline(yintercept = .5, linetype = "dashed", size = .2) +
+    labs(y = y_label, x = x_label, color = "Data") +
+    scale_color_manual(values = c("Observed" = "blue", "Predicted" = "red")) +
+    theme(text = element_text(size = 15), legend.position = "bottom")
+
+  if (!is.null(y_limits)) {
+    plot <- plot + scale_y_continuous(limits = y_limits)
+  }
+
+  return(plot)
+}
+
+# Create a comparison plot with overlaid data
+create_comparison_plot_choice <- function(observed_data, predicted_data, x_var, y_var, x_label, y_label, y_limits = NULL, convert_predicted_to_seconds = FALSE) {
+  observed_summary <- observed_data %>%
+    mutate({{ x_var }} := {{ x_var }} * 100) %>%
+    group_by({{ x_var }}) %>%
+    summarise(
+      m_left = mean({{ y_var }}),
+      se = sqrt(var({{ y_var }}) / n()),
+      .groups = "drop"
+    )
+  
+  predicted_summary <- predicted_data %>%
+    mutate({{ x_var }} := {{ x_var }} * 100) %>%
+    group_by({{ x_var }}) %>%
+    summarise(
+      m_left = if (convert_predicted_to_seconds) mean({{ y_var }}) / 1000 else mean({{ y_var }}),
+      se = if (convert_predicted_to_seconds) sqrt(var({{ y_var }})) / (1000 * sqrt(n())) else sqrt(var({{ y_var }}) / n()),
+      .groups = "drop"
+    )
+
+  plot <- ggplot() +
+    geom_pointrange(
+      data = observed_summary,
+      aes(x = {{ x_var }}, y = m_left, ymin = m_left - 1.96 * se, ymax = m_left + 1.96 * se, color = "Observed")
+    ) +
+    geom_line(data = observed_summary, aes(x = {{ x_var }}, y = m_left, color = "Observed"), size = 0.6) +
+    geom_pointrange(
+      data = predicted_summary,
+      aes(x = {{ x_var }}, y = m_left, ymin = m_left - 1.96 * se, ymax = m_left + 1.96 * se, color = "Predicted")
+    ) +
+    geom_line(data = predicted_summary, aes(x = {{ x_var }}, y = m_left, color = "Predicted"), size = 0.6) +
+    theme_classic() +
+    theme(
+      axis.title = element_text(size = 24),  # Increase font size for axis labels
+      axis.title.y = element_text(hjust = 0.5),
+      axis.text = element_text(size = 18),    # Adjust tick label size
+      plot.title = element_text(size = 24, face = "bold", family = "serif"),  # Increase title font size
+      text = element_text(family = "serif"),  # Set the overall plot font to serif
+      legend.position = "bottom",  # Position the legend to the right (can change to "top", "bottom", etc.)
+      legend.box = "box",  # Put the legend inside a box
+      legend.background = element_rect(color = "black"),
+      legend.text = element_text(size = 18),  # Increase the legend text size
+      legend.title =  element_blank()
+    ) +
+    
+    # geom_smooth(data=observed_summary, aes(x = {{ x_var }}, y = m_left), method="lm") +
+    # geom_smooth(data=predicted_summary, aes(x = {{ x_var }}, y = m_left), method="lm") +
+    # geom_hline(yintercept = .5, linetype = "dashed", size = .2) +
+    labs(y = y_label, x = x_label, color = "Data") +
+    scale_color_manual(values = c("Observed" = "blue", "Predicted" = "red")) +
+    theme(text = element_text(size = 15), legend.position = "bottom")
+  
+  if (!is.null(y_limits)) {
+    plot <- plot + scale_y_continuous(limits = y_limits)
+  }
+  
+  return(plot)
+}
+```
+
+```{r}
+# Calculate the row averages of m0_predictions
+row_averages <- rowMeans(m0_predictions)
+
+# Create the new m0_choice_predictions table
+m0_choice_predictions <- risk_data %>%
+  mutate(
+    response = ifelse(row_averages >= 0, 1, 0),  # 1 for positive, 0 for negative
+    rt = abs(row_averages)  # Absolute value of the row averages
+  )
+
+# Calculate the row averages of m0_predictions
+row_averages <- rowMeans(m1_predictions)
+
+# Create the new m0_choice_predictions table
+m1_choice_predictions <- risk_data %>%
+  mutate(
+    response = ifelse(row_averages >= 0, 1, 0),  # 1 for positive, 0 for negative
+    rt = abs(row_averages)  # Absolute value of the row averages
+  )
+
+
+# Create plots
+m0_choice_risk_plot <- create_comparison_plot_choice(
+  risk_data,
+  m0_choice_predictions,
+  risk,
+  response,
+  "Probability of Worsening (%)",
+  "Probability of Choosing\n Experimental Treatment",
+  y_limits = c(0, 1)
+)
+
+m0_choice_gain_plot <- create_comparison_plot_choice(
+  risk_data,
+  m0_choice_predictions,
+  gain,
+  response,
+  "Probability of Curing (%)",
+  "Probability of Choosing\n Experimental Treatment",
+  y_limits = c(0, 1)
+)
+
+m0_rt_risk_plot <- create_comparison_plot_rt(
+  risk_data,
+  m0_choice_predictions,
+  risk,
+  rt,
+  "Probability of Worsening (%)",
+  "Response Time (seconds)",
+  convert_predicted_to_seconds = FALSE
+)
+
+m0_rt_gain_plot <- create_comparison_plot_rt(
+  risk_data,
+  m0_choice_predictions,
+  gain,
+  rt,
+  "Probability of Curing (%)",
+  "Response Time (seconds)",
+  convert_predicted_to_seconds = FALSE
+)
+
+# Create plots
+m1_choice_risk_plot <- create_comparison_plot_choice(
+  risk_data,
+  m1_choice_predictions,
+  risk,
+  response,
+  "Probability of Worsening (%)",
+  "Probability of Choosing\n Experimental Treatment",
+  y_limits = c(0, 1)
+)
+
+m1_choice_gain_plot <- create_comparison_plot_choice(
+  risk_data,
+  m1_choice_predictions,
+  gain,
+  response,
+  "Probability of Curing (%)",
+  "Probability of Choosing\n Experimental Treatment",
+  y_limits = c(0, 1)
+)
+
+m1_rt_risk_plot <- create_comparison_plot_rt(
+  risk_data,
+  m1_choice_predictions,
+  risk,
+  rt,
+  "Probability of Worsening (%)",
+  "Response Time (seconds)",
+  convert_predicted_to_seconds = FALSE
+)
+
+m1_rt_gain_plot <- create_comparison_plot_rt(
+  risk_data,
+  m1_choice_predictions,
+  gain,
+  rt,
+  "Probability of Curing (%)",
+  "Response Time (seconds)",
+  convert_predicted_to_seconds = FALSE
+)
+```
+
+```{r}
+# Add individual titles for each plot
+# Center and remove legends from the plots
+m0_choice_risk_plot <- m0_choice_risk_plot + 
+  ggtitle("Model without Time Effect") +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 24, face = "bold"),   # Center the title
+    legend.position = "none"                                            # Remove the legend
+  )
+
+m1_choice_risk_plot <- m1_choice_risk_plot + 
+  ggtitle("Model with Time Effect") + 
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 24, face = "bold"),   # Center the title
+    legend.position = "none"                                            # Remove the legend
+  )
+
+# If theme(legend.position = "none") doesn't work, use guides to remove legends:
+m0_choice_risk_plot <- m0_choice_risk_plot +
+  guides(color = "none", fill = "none")
+
+m1_choice_risk_plot <- m1_choice_risk_plot +
+  guides(color = "none", fill = "none")
+
+fig2_plot <- (m0_choice_risk_plot + m1_choice_risk_plot) / (m0_choice_gain_plot + m1_choice_gain_plot) +
+  plot_annotation(
+    title = "Model Predictions vs. Observed Data",
+    theme = theme(plot.title = element_text(size = 28, hjust = 0.5, family="serif"))
+  ) &
+  theme(legend.position = "bottom")
+print(fig2_plot)
+```
+
+```{r}
+# Optionally, save the plot with increased width
+ggsave("Figures/Fig2_GAIN_RISK_COMPARISON.png", fig2_plot, width = 16, height = 12)
+```
+
+# Figure 3 (DDM Heatmap)
+
+## T Values
+
+I'm using T values instead of beta coefficients, since these are standardized
+
+```{r}
+# Create a wide format of the results data for t values
+t_wide <- dcast(results, Independent_Var ~ Dependent_Var, value.var = "T_Value")
+
+# Melt the wide data for ggplot2
+t_melt <- melt(t_wide, id.vars = "Independent_Var", variable.name = "Dependent_Var", value.name = "t")
+
+# Plot the heatmap for t values
+fig_3_plot_t = ggplot(t_melt, aes(x = Dependent_Var, y = Independent_Var, fill = t)) +
+  geom_tile(color = "black") +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0, 
+                       limit = c(min(t_melt$t, na.rm=TRUE), max(t_melt$t, na.rm=TRUE)), name = "t-value") +
+  theme_minimal(base_size = 24, base_family = "serif") +
+  theme(
+        panel.background = element_rect(fill = "white", color = NA), # White background for the panel
+        plot.background = element_rect(fill = "white", color = NA),  # White background for the plot
+        axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),
+        axis.text.y = element_text(face = "bold"),
+        plot.title = element_text(hjust = 0.5, face = "bold"),
+        panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank(),  # Remove minor gridlines
+        # legend.box.background = element_rect(color = "black", size = 0.5),  # Add black border around legend
+        legend.title = element_text(face = "bold"),  # Bold legend title
+        legend.text = element_text(size = 12)  # Adjust legend text size
+        ) +  # Center and bold title
+  labs(title = "Heatmap of t-values", x = "Drift Rate Parameters", y = "Ideological Variables")
+
+print(fig_3_plot_t)
+
+# Optionally, save the plot with increased width
+ggsave("Figures/Fig3_HEATMAP_t.png", fig_3_plot_t, width = 16, height = 12)
+```
+## P Values
+
+```{r}
+# Ensure you have the necessary libraries
+library(ggplot2)
+library(reshape2)
+
+# Create a wide format of the results data for P_Value values
+pvalue_wide <- dcast(results, Independent_Var ~ Dependent_Var, value.var = "P_Value")
+
+# Melt the wide data for ggplot2
+pvalue_melt <- melt(pvalue_wide, id.vars = "Independent_Var", variable.name = "Dependent_Var", value.name = "P_Value")
+
+# Log transform the P-Values (adding a small value to avoid log(0) issues)
+pvalue_melt$log_P_Value <- -log10(pvalue_melt$P_Value + 1e-10)
+
+# Plot the heatmap for P_Value values (log-transformed)
+fig_3_plot_pval = ggplot(pvalue_melt, aes(x = Dependent_Var, y = Independent_Var, fill = log_P_Value)) +
+  geom_tile(color = "black") +
+  scale_fill_gradient(low = "white", high = "darkgreen", 
+                      name = "Log(P-Value)", na.value = "grey50") +
+  theme_minimal(base_size = 24, base_family = "serif") +
+  theme(
+        panel.background = element_rect(fill = "white", color = NA), # White background for the panel
+        plot.background = element_rect(fill = "white", color = NA),  # White background for the plot
+        axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),
+        axis.text.y = element_text(face = "bold"),
+        plot.title = element_text(hjust = 0.5, face = "bold"),
+        panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank(),  # Remove minor gridlines
+        # legend.box.background = element_rect(color = "black", size = 0.5),  # Add black border around legend
+        legend.title = element_text(face = "bold"),  # Bold legend title
+        legend.text = element_text(size = 12)  # Adjust legend text size
+        ) +  # Center and bold title
+  labs(title = "Heatmap of Log-Transformed P-Values", x = "Drift Rate Parameters", y = "Ideological Variables")
+
+# Optionally, save the plot with increased width
+ggsave("Figures/Fig3_HEATMAP_PVAL.png", fig_3_plot_pval, width = 16, height = 12)
+```
+
+```{r}
+# Modify fig_3_plot_beta to increase the spacing of the y-axis label
+fig_3_plot_t <- fig_3_plot_t +
+  theme(
+    axis.title.y = element_text(margin = margin(r = 20), face = "bold"),  # Increase spacing
+    axis.title.x = element_text(face = "bold")
+  )
+
+# Modify fig_3_plot_pval to remove the y-axis label
+fig_3_plot_pval <- fig_3_plot_pval +
+  theme(
+    axis.title.y = element_blank(),  # Remove y-axis label
+    axis.title.x = element_text(face = "bold")
+  )
+
+# Combine the plots side by side
+fig3_combined_plot <- fig_3_plot_t + fig_3_plot_pval
+
+# Display the combined plot
+print(fig3_combined_plot)
+
+# Display the combined plot
+print(fig3_combined_plot)
+ggsave("Figures/Fig3_HEATMAP_COMBINED.png", fig3_combined_plot, width = 24, height = 12)
+```
+
+## Subscore Versions
+
+## T Values
+
+I'm using T values instead of beta coefficients, since these are standardized
+
+```{r}
+# Create a wide format of the results data for t values
+t_wide <- dcast(subscore_results, Independent_Var ~ Dependent_Var, value.var = "T_Value")
+
+# Melt the wide data for ggplot2
+t_melt <- melt(t_wide, id.vars = "Independent_Var", variable.name = "Dependent_Var", value.name = "t")
+
+# Plot the heatmap for t values
+fig_3_plot_t = ggplot(t_melt, aes(x = Dependent_Var, y = Independent_Var, fill = t)) +
+  geom_tile(color = "black") +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0, 
+                       limit = c(min(t_melt$t, na.rm=TRUE), max(t_melt$t, na.rm=TRUE)), name = "t-value") +
+  theme_minimal(base_size = 24, base_family = "serif") +
+  theme(
+        panel.background = element_rect(fill = "white", color = NA), # White background for the panel
+        plot.background = element_rect(fill = "white", color = NA),  # White background for the plot
+        axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),
+        axis.text.y = element_text(face = "bold"),
+        plot.title = element_text(hjust = 0.5, face = "bold"),
+        panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank(),  # Remove minor gridlines
+        # legend.box.background = element_rect(color = "black", size = 0.5),  # Add black border around legend
+        legend.title = element_text(face = "bold"),  # Bold legend title
+        legend.text = element_text(size = 12)  # Adjust legend text size
+        ) +  # Center and bold title
+  labs(title = "Heatmap of t-values", x = "Drift Rate Parameters", y = "Ideological Variables")
+
+print(fig_3_plot_t)
+
+# Optionally, save the plot with increased width
+ggsave("Figures/Fig3_subscores_HEATMAP_t.png", fig_3_plot_t, width = 16, height = 12)
+```
+## P Values
+
+```{r}
+# Ensure you have the necessary libraries
+library(ggplot2)
+library(reshape2)
+
+# Create a wide format of the results data for P_Value values
+pvalue_wide <- dcast(subscore_results, Independent_Var ~ Dependent_Var, value.var = "P_Value")
+
+# Melt the wide data for ggplot2
+pvalue_melt <- melt(pvalue_wide, id.vars = "Independent_Var", variable.name = "Dependent_Var", value.name = "P_Value")
+
+# Log transform the P-Values (adding a small value to avoid log(0) issues)
+pvalue_melt$log_P_Value <- -log10(pvalue_melt$P_Value + 1e-10)
+
+# Plot the heatmap for P_Value values (log-transformed)
+fig_3_plot_pval = ggplot(pvalue_melt, aes(x = Dependent_Var, y = Independent_Var, fill = log_P_Value)) +
+  geom_tile(color = "black") +
+  scale_fill_gradient(low = "white", high = "darkgreen", 
+                      name = "Log(P-Value)", na.value = "grey50") +
+  theme_minimal(base_size = 24, base_family = "serif") +
+  theme(
+        panel.background = element_rect(fill = "white", color = NA), # White background for the panel
+        plot.background = element_rect(fill = "white", color = NA),  # White background for the plot
+        axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),
+        axis.text.y = element_text(face = "bold"),
+        plot.title = element_text(hjust = 0.5, face = "bold"),
+        panel.grid.major = element_blank(),  # Remove major gridlines
+        panel.grid.minor = element_blank(),  # Remove minor gridlines
+        # legend.box.background = element_rect(color = "black", size = 0.5),  # Add black border around legend
+        legend.title = element_text(face = "bold"),  # Bold legend title
+        legend.text = element_text(size = 12)  # Adjust legend text size
+        ) +  # Center and bold title
+  labs(title = "Heatmap of Log-Transformed P-Values", x = "Drift Rate Parameters", y = "Ideological Variables")
+
+# Optionally, save the plot with increased width
+ggsave("Figures/Fig3_subscores_HEATMAP_PVAL.png", fig_3_plot_pval, width = 16, height = 12)
+```
+
+```{r}
+# Modify fig_3_plot_beta to increase the spacing of the y-axis label
+fig_3_plot_t <- fig_3_plot_t +
+  theme(
+    axis.title.y = element_text(margin = margin(r = 20), face = "bold"),  # Increase spacing
+    axis.title.x = element_text(face = "bold")
+  )
+
+# Modify fig_3_plot_pval to remove the y-axis label
+fig_3_plot_pval <- fig_3_plot_pval +
+  theme(
+    axis.title.y = element_blank(),  # Remove y-axis label
+    axis.title.x = element_text(face = "bold")
+  )
+
+# Combine the plots side by side
+fig3_combined_plot <- fig_3_plot_t + fig_3_plot_pval
+
+# Display the combined plot
+print(fig3_combined_plot)
+
+# Display the combined plot
+print(fig3_combined_plot)
+ggsave("Figures/Fig3_subscores_HEATMAP_COMBINED.png", fig3_combined_plot, width = 24, height = 12)
+```
+
+# Figure 3b (Ridge Regression Heatmap)
+
+
+
+# Figure 4 (Time varying graph)
+
+Make each participant be a point on the graph. Use the average of the number of times that experimental treatment was selected as the y-axis
+
+## Compute average of DDM Statistics
+
+```{r}
+# Step 1: Identify columns with square brackets in m1_posterior
+# Extract columns that match the pattern with ".p[XX]" or just "[XX]"
+selected_columns <- m1_posterior %>%
+  select(matches("\\[\\d+\\]$"))
+
+# Step 2: Calculate the averages for each column
+averages <- selected_columns %>%
+  summarise(across(everything(), mean, na.rm = TRUE))
+
+# Step 3: Extract both metric_name and participant_id, handling both ".p[XX]" and "[XX]"
+column_info <- tibble(
+  full_colname = colnames(averages),
+  participant_id = str_extract(colnames(averages), "(?<=\\[)\\d+(?=\\])"),  # Extract participant ID if present in square brackets
+  metric_name = str_replace(colnames(averages), "\\.?p?\\[\\d+\\]$", "")  # Remove either ".p[XX]" or "[XX]"
+)
+
+# Pivot the data into wide format where each metric_name becomes a separate column
+averages_wide <- averages %>%
+  pivot_longer(cols = everything(), names_to = "full_colname", values_to = "average") %>%
+  left_join(column_info, by = "full_colname") %>%
+  mutate(participant_id = as.numeric(participant_id)) %>%
+  select(participant_id, metric_name, average) %>%
+  pivot_wider(names_from = metric_name, values_from = average)  # Pivot into wide format
+```
+
+## Compute average response per participant then join
+
+```{r}
+library(dplyr)
+
+# Step 1: Group risk_data by idxP and calculate the average of the response column
+risk_data_avg <- risk_data %>%
+  group_by(idxP) %>%
+  summarise(avg_response = mean(response, na.rm = TRUE))
+
+# Step 2: Join the risk_data_avg with averages_wide by idxP and participant_id
+participant_average <- risk_data_avg %>%
+  left_join(averages_wide, by = c("idxP" = "participant_id"))
+
+# Step 3: (Optional) View the final data
+head(participant_average)
+```
+
+## Plot response by time latency
+
+Positive time parameter means risk comes first.
+Negative time parameter means benefit comes first.
+
+### Benefit
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+participant_average <- risk_data_avg %>%
+  left_join(averages_wide, by = c("idxP" = "participant_id"))
+
+# participant_average$b_diff <- abs(participant_average$b_gain - participant_average$b_risk)
+# participant_average$b_diff <- participant_average$b_risk
+participant_average$b_diff <- participant_average$b_gain
+
+# Step 1: Split participant_average into 5 quintiles based on b_diff
+participant_average <- participant_average %>%
+  mutate(b_diff_group = cut(b_diff, breaks = quantile(b_diff, probs = seq(0, 1, 0.2), na.rm = TRUE), include.lowest = TRUE))
+
+# Step 2: For each b_gain group, split into 5 time quintiles and label them (1st, 2nd, 3rd, 4th, 5th)
+participant_average <- participant_average %>%
+  group_by(b_diff_group) %>%
+  mutate(time_group = cut(time, breaks = quantile(time, probs = seq(0, 1, 0.2), na.rm = TRUE), 
+                          labels = c("1st \n(Benefits First)", "2nd", "3rd", "4th", "5th \n(Risks First)"), include.lowest = TRUE))
+
+
+# Step 3: Calculate the average and confidence intervals for avg_response in each b_gain and time quintile
+summary_data <- participant_average %>%
+  group_by(b_diff_group, time_group) %>%
+  summarise(
+    avg_response_mean = mean(avg_response, na.rm = TRUE),
+    avg_response_ci_lower = mean(avg_response, na.rm = TRUE) - 1.96 * sd(avg_response, na.rm = TRUE) / sqrt(n()),
+    avg_response_ci_upper = mean(avg_response, na.rm = TRUE) + 1.96 * sd(avg_response, na.rm = TRUE) / sqrt(n())
+  )
+
+# Step 4: Plot all b_gain groups on the same plot with time quintiles on x-axis
+fig4_plot <- ggplot(summary_data, aes(x = time_group, y = avg_response_mean, color = b_diff_group, group = b_diff_group)) +
+  geom_line(size = 3) +
+  geom_point() +
+  geom_errorbar(aes(ymin = avg_response_ci_lower, ymax = avg_response_ci_upper), width = 0.1) +  # Add error bars
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", size = 2) +  # Add dashed vertical line for zero
+  labs(x = "Latency Quintiles", color = "Benefit Sensitivity") +
+  ggtitle("Grouped by Benefit Sensitivity") +  # Add title
+  theme_minimal(base_family = "arial") +  # Change font to serif
+  theme(
+    legend.position = "right",
+    plot.title = element_text(size = 84, face = "bold", hjust = 0.5),  # Increase title font size
+    axis.title = element_text(size = 72, face = "bold"),  # Increase axis label font size
+    axis.text = element_text(size = 72),   # Increase axis text size
+    legend.text = element_text(size = 72), # Increase legend text size
+    legend.title = element_text(size = 72, face = "bold"), # Increase legend title size
+    panel.background = element_rect(fill = "white", color = "white"),  # White panel background
+    plot.background = element_rect(fill = "white", color = "white"),   # White plot background
+    panel.grid.major = element_line(color = "grey80"),   # Optional: Adjust grid lines for better visibility
+    panel.grid.minor = element_line(color = "grey90"),    # Optional: Lighter minor grid lines
+    # axis.title.y = element_text(margin = margin(r = 20), face = "bold")
+    axis.title.y = element_blank(),
+    axis.title.x = element_text(margin = margin(t = 40), face = "bold"),  # Add space between x-axis title and text
+  ) + 
+  scale_color_manual(
+    values = c("#0000FF", "#007FFF", "green", "#FF7F7F", "#FF0000"),  # Adjust colors as needed
+    # labels = c("Smallest difference", "", "", "", "Biggest difference"),  # Custom legend labels
+        labels = c("Least sensitive", "", "", "", "Most sensitive"),  # Custom legend labels
+    guide = guide_legend(override.aes = list(size = 5))  # Increase legend icon size
+  ) + 
+  ylim(0, 1)
+
+print(fig4_plot)
+
+# Optionally, save the plot with increased width
+ggsave("Figures/Fig4_TIME_LATENCY_BENEFIT.png", fig4_plot, width = 24, height = 16)
+```
+
+### Risk
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+participant_average <- risk_data_avg %>%
+  left_join(averages_wide, by = c("idxP" = "participant_id"))
+
+# participant_average$b_diff <- abs(participant_average$b_gain - participant_average$b_risk)
+participant_average$b_diff <- participant_average$b_risk
+# participant_average$b_diff <- participant_average$b_gain
+
+# Step 1: Split participant_average into 5 quintiles based on b_diff
+participant_average <- participant_average %>%
+  mutate(b_diff_group = cut(b_diff, breaks = quantile(b_diff, probs = seq(0, 1, 0.2), na.rm = TRUE), include.lowest = TRUE))
+
+# Step 2: For each b_gain group, split into 5 time quintiles and label them (1st, 2nd, 3rd, 4th, 5th)
+participant_average <- participant_average %>%
+  group_by(b_diff_group) %>%
+  mutate(time_group = cut(time, breaks = quantile(time, probs = seq(0, 1, 0.2), na.rm = TRUE), 
+                          labels = c("1st \n(Benefits First)", "2nd", "3rd", "4th", "5th \n(Risks First)"), include.lowest = TRUE))
+
+
+# Step 3: Calculate the average and confidence intervals for avg_response in each b_gain and time quintile
+summary_data <- participant_average %>%
+  group_by(b_diff_group, time_group) %>%
+  summarise(
+    avg_response_mean = mean(avg_response, na.rm = TRUE),
+    avg_response_ci_lower = mean(avg_response, na.rm = TRUE) - 1.96 * sd(avg_response, na.rm = TRUE) / sqrt(n()),
+    avg_response_ci_upper = mean(avg_response, na.rm = TRUE) + 1.96 * sd(avg_response, na.rm = TRUE) / sqrt(n())
+  )
+
+summary_data <- summary_data %>%
+  mutate(b_diff_group = fct_rev(as.factor(b_diff_group)))
+
+# Step 4: Plot all b_gain groups on the same plot with time quintiles on x-axis
+fig4_plot <- ggplot(summary_data, aes(x = time_group, y = avg_response_mean, color = b_diff_group, group = b_diff_group)) +
+  geom_line(size = 3) +
+  geom_point() +
+  geom_errorbar(aes(ymin = avg_response_ci_lower, ymax = avg_response_ci_upper), width = 0.1) +  # Add error bars
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", size = 2) +  # Add dashed vertical line for zero
+  labs(x = "Latency Quintiles", y = "Average Probability of\nEndorsing Treatment", color = "Risk Sensitivity") +
+  ggtitle("Grouped by Risk Sensitivity") +  # Add title
+  theme_minimal(base_family = "arial") +  # Change font to serif
+  theme(
+    legend.position = "right",
+    plot.title = element_text(size = 84, face = "bold", hjust = 0.5),  # Increase title font size
+    axis.title = element_text(size = 72, face = "bold"),  # Increase axis label font size
+    axis.text = element_text(size = 72),   # Increase axis text size
+    legend.text = element_text(size = 72), # Increase legend text size
+    legend.title = element_text(size = 72, face = "bold"), # Increase legend title size
+    panel.background = element_rect(fill = "white", color = "white"),  # White panel background
+    plot.background = element_rect(fill = "white", color = "white"),   # White plot background
+    panel.grid.major = element_line(color = "grey80"),   # Optional: Adjust grid lines for better visibility
+    panel.grid.minor = element_line(color = "grey90"),    # Optional: Lighter minor grid lines
+    # axis.title.y = element_text(margin = margin(r = 20), face = "bold")
+    axis.title.y = element_blank(),
+    axis.title.x = element_text(margin = margin(t = 40), face = "bold"),  # Add space between x-axis title and text
+  ) + 
+  scale_color_manual(
+    values = c("#0000FF", "#007FFF", "green", "#FF7F7F", "#FF0000"),  # Adjust colors as needed
+    # labels = c("Smallest difference", "", "", "", "Biggest difference"),  # Custom legend labels
+        labels = c("Least sensitive", "", "", "", "Most sensitive"),  # Custom legend labels
+    guide = guide_legend(override.aes = list(size = 5))  # Increase legend icon size
+  ) + 
+  ylim(0, 1)
+
+print(fig4_plot)
+
+# Optionally, save the plot with increased width
+ggsave("Figures/Fig4_TIME_LATENCY_RISK.png", fig4_plot, width = 24, height = 16)
+```
+
+### Difference
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+participant_average <- risk_data_avg %>%
+  left_join(averages_wide, by = c("idxP" = "participant_id"))
+
+participant_average$b_diff <- abs(participant_average$b_gain - participant_average$b_risk)
+# participant_average$b_diff <- participant_average$b_risk
+# participant_average$b_diff <- participant_average$b_gain
+
+# Step 1: Split participant_average into 5 quintiles based on b_diff
+participant_average <- participant_average %>%
+  mutate(b_diff_group = cut(b_diff, breaks = quantile(b_diff, probs = seq(0, 1, 0.2), na.rm = TRUE), include.lowest = TRUE))
+
+# Step 2: For each b_gain group, split into 5 time quintiles and label them (1st, 2nd, 3rd, 4th, 5th)
+participant_average <- participant_average %>%
+  group_by(b_diff_group) %>%
+  mutate(time_group = cut(time, breaks = quantile(time, probs = seq(0, 1, 0.2), na.rm = TRUE), 
+                          labels = c("1st \n(Benefits First)", "2nd", "3rd", "4th", "5th \n(Risks First)"), include.lowest = TRUE))
+
+
+# Step 3: Calculate the average and confidence intervals for avg_response in each b_gain and time quintile
+summary_data <- participant_average %>%
+  group_by(b_diff_group, time_group) %>%
+  summarise(
+    avg_response_mean = mean(avg_response, na.rm = TRUE),
+    avg_response_ci_lower = mean(avg_response, na.rm = TRUE) - 1.96 * sd(avg_response, na.rm = TRUE) / sqrt(n()),
+    avg_response_ci_upper = mean(avg_response, na.rm = TRUE) + 1.96 * sd(avg_response, na.rm = TRUE) / sqrt(n())
+  )
+
+# Step 4: Plot all b_gain groups on the same plot with time quintiles on x-axis
+fig4_plot <- ggplot(summary_data, aes(x = time_group, y = avg_response_mean, color = b_diff_group, group = b_diff_group)) +
+  geom_line(size = 2) +
+  geom_point() +
+  geom_errorbar(aes(ymin = avg_response_ci_lower, ymax = avg_response_ci_upper), width = 0.1) +  # Add error bars
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", size = 2) +  # Add dashed vertical line for zero
+  labs(x = "Latency Quintiles", color = "Overall sensitivity") +
+  ggtitle("Grouped by Overall Sensitivity") +  # Add title
+  theme_minimal(base_family = "serif") +  # Change font to serif
+  theme(
+    legend.position = "right",
+    plot.title = element_text(size = 64, face = "bold", hjust = 0.5),  # Increase title font size
+    axis.title = element_text(size = 60, face = "bold"),  # Increase axis label font size
+    axis.text = element_text(size = 56),   # Increase axis text size
+    legend.text = element_text(size = 56), # Increase legend text size
+    legend.title = element_text(size = 60, face = "bold"), # Increase legend title size
+    panel.background = element_rect(fill = "white", color = "white"),  # White panel background
+    plot.background = element_rect(fill = "white", color = "white"),   # White plot background
+    panel.grid.major = element_line(color = "grey80"),   # Optional: Adjust grid lines for better visibility
+    panel.grid.minor = element_line(color = "grey90"),    # Optional: Lighter minor grid lines
+    # axis.title.y = element_text(margin = margin(r = 20), face = "bold")
+    axis.title.y = element_blank()
+  ) + 
+  scale_color_manual(
+    values = c("#0000FF", "#007FFF", "green", "#FF7F7F", "#FF0000"),  # Adjust colors as needed
+    labels = c("Least sensitive", "", "", "", "Most sensitive"),  # Custom legend labels
+        # labels = c("Most negative", "", "", "", "Most positive"),  # Custom legend labels
+    guide = guide_legend(override.aes = list(size = 5))  # Increase legend icon size
+  ) + 
+  ylim(0, 1)
+
+print(fig4_plot)
+
+# Optionally, save the plot with increased width
+ggsave("Figures/Fig4_TIME_LATENCY_DIFF.png", fig4_plot, width = 24, height = 12)
+```
+
+Left is risk comes first
+Right is benefit comes first
+
+# Figure 5 (Feature Importance)
+
+## Large Factor Labels
+
+```{r}
+library(dplyr)
+category_colors <- c(
+  "BIG5" = "#808080",
+  "Moral Foundations (MFQ)" = "#009E73",
+  "Religious & Spiritual" = "#F0E442", 
+  "Risk Taking (GRiPS)" = "#d62728",
+  "Interpersonal Reactivity" = "#88CCEE",
+  "Values (Schwartz)" = "#AA4499",
+  "Political" = "#117733",
+  "Demographics" = "#882255",
+  "Moral Commitments" = "#bcbd22",
+  "Numeracy" = "#661100",
+  "Optimize" = "#332288",
+  "Human Mind" = "#D55E00"
+  # "Other" = "#7f7f7f"
+)
+
+# Update category mapping to separate BIG5 dimensions based on scoring key
+category_mapping <- list(
+  "BIG5" = "^BIG5",
+  
+  # Rest of categories remain the same
+  "Moral Foundations (MFQ)" = "^MFSQ",
+  "Religious & Spiritual" = c("^Religion", "^AttendChurch", "Spirituality", "Religiosity", "^ReligiousActivity", "meditation"),
+  "Risk Taking (GRiPS)" = "^GRiPS_",
+  "Interpersonal Reactivity" = c("^PT", "^EC", "^PD", "^FS"),
+  "Values (Schwartz)" = c("TRADITION", "SELF.DIRECTION", "SECURITY", "CONFORMITY", "BENEVOLENCE",
+                          "POWER", "ACHIEVEMENT", "STIMULATION", "HEDONISM", "UNIVERSALISM"),
+  "Political" = c("^Political_Party", "liberal", "conservative", "republican", "democrat", "independent"),
+  "Demographics" = c("^education", "^RelationshipStatus", "age", "^sex", "race_ethnicity", "YearOfEducation"),
+  "Moral Commitments" = "^MC_",
+  "Numeracy" = c("^Berlin", "^SNS"),
+  "Optimize" = "Optimize",
+  "Human Mind" = "HumanMind"
+)
+
+# Define parameter names with expressions for rendering
+measure_names <- c(
+  "time" = expression(s[time]),
+  "b_gain" = expression(nu[beta[gain]]),
+  "b_risk" = expression(nu[beta[risk]]),
+  "alpha" = expression(alpha),
+  "theta" = expression(tau),
+  "bias" = expression(z)
+)
+
+# Function to map to the categories we hard-coded above
+get_category <- function(feature_name) {
+  for(cat_name in names(category_mapping)) {
+    patterns <- category_mapping[[cat_name]]
+    if(any(sapply(patterns, function(p) grepl(p, feature_name)))) {
+      return(cat_name)
+    }
+  }
+  return("Other")
+}
+```
+
+## Factor Cluster Labels
+
+Drawing the feature importance at the item levels doesn't provide too much.
+
+```{r}
+library(dplyr)
+
+# Update category mapping to separate BIG5 dimensions based on scoring key
+category_mapping <- list(
+  "BIG5 - Extraversion" = c("BIG5_1", "BIG5_6", "BIG5_11", "BIG5_16", "BIG5_21", "BIG5_26", "BIG5_31", "BIG5_36", "BIG5_41", "BIG5_46", "BIG5_51", "BIG5_56"),
+  "BIG5 - Agreeableness" = c("BIG5_2", "BIG5_7", "BIG5_12", "BIG5_17", "BIG5_22", "BIG5_27", "BIG5_32", "BIG5_37", "BIG5_42", "BIG5_47", "BIG5_52", "BIG5_57"),
+  "BIG5 - Conscientiousness" = c("BIG5_3", "BIG5_8", "BIG5_13", "BIG5_18", "BIG5_23", "BIG5_28", "BIG5_33", "BIG5_38", "BIG5_43", "BIG5_48", "BIG5_53", "BIG5_58"),
+  "BIG5 - Negative Emotionality" = c("BIG5_4", "BIG5_9", "BIG5_14", "BIG5_19", "BIG5_24", "BIG5_29", "BIG5_34", "BIG5_39", "BIG5_44", "BIG5_49", "BIG5_54", "BIG5_59"),
+  "BIG5 - Open-Mindedness" = c("BIG5_5", "BIG5_10", "BIG5_15", "BIG5_20", "BIG5_25", "BIG5_30", "BIG5_35", "BIG5_40", "BIG5_45", "BIG5_50", "BIG5_55", "BIG5_60"),
+  "Moral Foundations - Harm" = c("MFSQ1", "MFSQ7", "MFSQ12", "MFSQ17", "MFSQ23", "MFSQ28"),
+  "Moral Foundations - Fairness" = c("MFSQ2", "MFSQ8", "MFSQ13", "MFSQ18", "MFSQ24", "MFSQ29"),
+  "Moral Foundations - Loyalty" = c("MFSQ3", "MFSQ9", "MFSQ14", "MFSQ19", "MFSQ25", "MFSQ30"),
+  "Moral Foundations - Authority" = c("MFSQ4", "MFSQ10", "MFSQ15", "MFSQ20", "MFSQ26", "MFSQ31"),
+  "Moral Foundations - Purity" = c("MFSQ5", "MFSQ11", "MFSQ16", "MFSQ21", "MFSQ27", "MFSQ32"),
+  "Moral Foundations - Unclassified" = c("MFSQ6", "MFSQ22"),
+  "Religious & Spiritual" = c("^Religion", "^AttendChurch", "Spirituality", "Religiosity", "^ReligiousActivity", "meditation"),
+  "Risk Taking (GRiPS)" = "^GRiPS_",
+  "Interpersonal Reactivity - Perspective Taking" = "^PT", 
+  "Interpersonal Reactivity - Empathic Concern" = "^EC", 
+  "Interpersonal Reactivity - Personal Distress" = "^PD",
+  "Interpersonal Reactivity - Fantasy" = "^FS",
+  "Values (Schwartz) - Tradition" = "TRADITION", 
+  "Values (Schwartz) - Self Direction" = "SELF.DIRECTION", 
+  "Values (Schwartz) - Security" = "SECURITY", 
+  "Values (Schwartz) - Conformity" = "CONFORMITY", 
+  "Values (Schwartz) - Benevolence" = "BENEVOLENCE",
+  "Values (Schwartz) - Power" = "POWER", 
+  "Values (Schwartz) - Achievement" = "ACHIEVEMENT", 
+  "Values (Schwartz) - Stimulation" = "STIMULATION", 
+  "Values (Schwartz) - Hedonism" = "HEDONISM", 
+  "Values (Schwartz) - Universalism" = "UNIVERSALISM",
+  "Political" = c("^Political_Party", "liberal", "conservative", "republican", "democrat", "independent"),
+  "Demographics" = c("^education", "^RelationshipStatus", "age", "^sex", "race_ethnicity", "YearOfEducation"),
+  "Moral Commitments" = "^MC_",
+  "Berlin Numeracy" = "^Berlin",
+  "Subjective Numeracy" = "^SNS",
+  "Optimize" = "Optimize",
+  "Human Mind" = "HumanMind"
+)
+
+# Define parameter names with expressions for rendering
+measure_names <- c(
+  "time" = expression(s[time]),
+  "b_gain" = expression(nu[beta[gain]]),
+  "b_risk" = expression(nu[beta[risk]]),
+  "alpha" = expression(alpha),
+  "theta" = expression(tau),
+  "bias" = expression(z)
+)
+
+# Function to map to the categories we hard-coded above
+get_category <- function(feature_name) {
+  for(cat_name in names(category_mapping)) {
+    patterns <- category_mapping[[cat_name]]
+    if(any(sapply(patterns, function(p) grepl(p, feature_name)))) {
+      return(cat_name)
+    }
+  }
+  return("Other")
+}
+
+library(grDevices)
+
+# Define a custom jet-like color palette
+jet_colors <- colorRampPalette(c("blue", "cyan", "yellow", "red"))(length(categories))
+
+# Assign colors to categories
+category_colors <- setNames(jet_colors, categories)
+```
+
+
+## Draw Plot
+```{r}
+library(ggplot2)
+library(dplyr)
+library(cowplot)
+library(patchwork)
+library(ggtext)
+
+measure_names <- c(
+  "time" = "Time",
+  "b_gain" = "Gain Sensitivity",
+  "b_risk" = "Risk Sensitivity",
+  "alpha" = "Response Caution",
+  "theta" = "Tau",
+  "bias" = "Z"
+)
+
+create_importance_plot <- function(data, measure) {
+  
+  data_plt <- data %>%
+    mutate(
+      Category = sapply(Feature, get_category),
+      StdError = StdError,
+      Importance = Importance
+    ) %>%
+    arrange(desc(Importance))
+  
+  # Get top 10 data for inset
+  top_10_data <- data_plt %>%
+    slice(1:10)
+  
+  data_plt$Category <- factor(data_plt$Category, levels = names(category_colors))
+  # browser()
+  # main plot
+  main_plot <- ggplot(data_plt, 
+                      aes(x = Importance, 
+                          y = reorder(Feature, Importance),
+                          fill = Category)) +
+    geom_bar(stat = "identity", width = 1) +
+    scale_fill_manual(values = category_colors, drop = FALSE) +
+    scale_x_continuous(
+      labels = scales::scientific_format(digits = 2),
+      breaks = scales::pretty_breaks(n = 6),
+      expand = c(0, 0)
+    ) +
+    theme_classic() +
+    theme(
+ plot.title = element_markdown(
+    family = "Arial", size = 64, face = "bold", margin = margin(b = 5)
+  ),
+  text = element_text(family = "Arial", size = 24),
+  axis.title = element_text(family = "Arial", size = 56, face = "bold"),
+  axis.text = element_text(family = "Arial", size = 32),
+  axis.text.x = element_text(angle = 45, hjust = 1),
+  legend.title = element_text(family = "Arial", size = 56, face = "bold"),
+  legend.text = element_text(family = "Arial", size = 56),
+  legend.position = "right",
+  legend.key.size = unit(1.5, "cm"),
+  axis.text.y = element_blank(),
+  axis.line.y = element_blank(),
+  axis.ticks = element_blank(),
+  panel.grid = element_blank(),
+  plot.margin = margin(t = 20, r = 20, b = 20, l = 20, unit = "pt")
+    ) +
+    labs(
+      x = "Feature Importance",
+      y = "Items",
+      fill = "Surveys",
+      title = measure_names[measure]
+    )
+  
+  # inset plot
+  main_plot + 
+    annotation_custom(
+      ggplotGrob(
+        ggplot(top_10_data, 
+               aes(x = Importance, 
+                   y = reorder(Feature, Importance),
+                   fill = Category)) +
+          geom_bar(stat = "identity", width = 1) +
+          scale_fill_manual(values = category_colors, drop = FALSE) +
+          scale_x_continuous(
+            labels = scales::scientific_format(digits = 2),
+            breaks = function(x) c(min(x), max(x))
+          ) +
+          theme_classic() +
+          theme(
+            text = element_text(family = "Arial", size = 24),          # to increased size
+            axis.text.y = element_text(size = 32, face="bold"),                         # to increased size y-axis text
+            axis.text.x = element_text(size = 32),                         # to increased size x-axis text
+            legend.position = "none",
+            panel.grid = element_blank(),
+            plot.title = element_blank(),
+            axis.title = element_blank(),
+            panel.border = element_rect(color = "black", fill = NA, size = 1.5)  # to increased size border
+          )
+      ),
+      xmin = quantile(data_plt$Importance, 0.6),
+      xmax = (quantile(data_plt$Importance, 1) - quantile(data_plt$Importance, 0.5)) * .9 + quantile(data_plt$Importance, 0.5),
+      ymin = 5,
+      ymax = 135
+    )
+}
+
+# Create plots for each measure
+measures <- c("b_gain", "b_risk", "time", "alpha")
+plots <- lapply(measures, function(measure) {
+  create_importance_plot(importance_results[[measure]], measure)
+})
+
+# Combine plots with a single legend
+combined_plot <- wrap_plots(plots, ncol = 2) +
+  plot_layout(guides = "collect") &
+  theme(
+    legend.position = "right",
+    plot.tag = element_text(size = 24, face = "bold")  # Control tag appearance here
+  )
+
+# Save combined plot
+ggsave(
+  filename = "Figures/feature_importance_final.png",
+  plot = combined_plot,
+  width = 32,
+  height = 32,
+  dpi = 300
+)
+
+# Display combined plot
+print(combined_plot)
+```
+
+
+# Figure 6 (Permutation Test)
+
+```{r}
+# Loop through each category in results and filter significant p-values
+significant_results <- list()
+measures <- c("time", "b_gain", "b_risk", "alpha", "theta", "bias")
+for (category in measures) {
+  df <- results[[category]]  # Extract dataframe for the category
+  
+  # Filter rows where P_Value is significant
+  sig_df <- df[df$P_Value > 0.95 | df$P_Value < 0.05, ]
+  
+  # If significant results exist, store them
+  if (nrow(sig_df) > 0) {
+    significant_results[[category]] <- sig_df[, c("Category", "P_Value")]
+  }
+}
+```
+
+
+```{r}
+# Run a FDR test
+
+# Load necessary package
+library(dplyr)
+
+# Function to compute FDR corrected p-values
+compute_fdr_p_values <- function(df) {
+  df <- df %>%
+    mutate(
+      FDR_P_Value = p.adjust(P_Value, method = "fdr"),  # Standard FDR correction
+      Flipped_P_Value = 1 - P_Value,  # Flip the probabilities
+      FDR_Flipped_P_Value = p.adjust(Flipped_P_Value, method = "fdr") # Apply BH correction to flipped values
+    ) 
+  return(df)
+}
+
+# Apply the function to each category in results
+final_factor_results <- lapply(final_factor_results, compute_fdr_p_values)
+
+```
+
+
+```{r}
+# Create plots for each measure
+measures <- c("time", "b_gain", "b_risk", "alpha", "theta", "bias")
+measure_labels <- c(
+  "time" = "Time",
+  "b_gain" = "Gain Sensitivity",
+  "b_risk" = "Risk Sensitivity",
+  "alpha" = "Response Caution",
+  "theta" = "Non-decision Time",
+  "bias" = "Bias"
+)
+
+library(ggplot2)
+library(gridExtra)
+
+# Define function to create and save plots
+plot_permutation_test <- function(category_name, df) {
+# Convert Null_Distribution into long format for boxplot
+  null_dist_long <- do.call(rbind, lapply(1:nrow(df), function(i) {
+    data.frame(Category = df$Category[i], Value = as.numeric(unlist(df$Null_Distribution[i])))
+  }))
+  
+  # Identify categories with p-value > 0.95
+  df$Significance <- ifelse(df$P_Value > 0.95, "***", "")
+  
+  # Extract test means
+  test_means <- data.frame(Category = df$Category, Value = df$test_mean, Error = df$test_sd, Significance = df$Significance)
+
+  # Get the new title
+  title_name <- measure_labels[[category_name]]
+  
+  # Generate plot
+  p <- ggplot(null_dist_long, aes(x = Category, y = Value)) +
+    geom_violin(fill = "lightblue", color = "black", alpha = 0.7) +  
+    # Individual null distribution points (small, transparent blue)
+    # geom_jitter(width = 0.2, alpha = 0.3, color = "blue", size = 1) +
+    # Test mean as a red dot
+    geom_point(data = test_means, aes(x = Category, y = Value), color = "red", size = 3) + 
+    # Add error bars around the test means
+    geom_errorbar(data = test_means, aes(x = Category, ymin = Value - Error, ymax = Value + Error), 
+                  width = 0.2, color = "red", linewidth = 1) +
+    #     # Add asterisks for p-value > 0.95
+    # geom_text(data = test_means, aes(x = Category, y = Value + Error + 0.02, label = Significance), 
+    #           color = "black", size = 6, fontface = "bold") +
+    # White background
+    theme_classic(base_family = "arial") +  
+    # Labels
+    labs(title = paste0("Feature Importance for ", title_name), x = "Category", y = "Feature\nImportance") +
+    # Styling
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 24),
+      axis.title.x = element_text(size = 32, face = "bold"),  # Larger x-axis title
+      axis.title.y = element_text(size = 32, face = "bold"),  # Larger y-axis title
+      axis.text.y = element_text(size = 18),
+      panel.background = element_rect(fill = "white", color = "white"),
+      plot.background = element_rect(fill = "white", color = "white"),
+      plot.title = element_text(hjust = 0.5, size = 36, face = "bold", margin = margin(b = 25)),  # Centered, larger title
+      plot.margin = margin(10, 40, 40, 40),
+      panel.spacing = unit(0.5, "lines")
+    )
+
+  # Save the figure
+  output_path <- paste0("Figures/NewPermutationTest_", category_name, ".png")
+  ggsave(output_path, p, width = 12, height = 8, dpi = 300, limitsize=FALSE)
+}
+
+# Loop through each category in results and create plots
+for (category in measures) {
+  plot_permutation_test(category, final_results[[category]])
+}
+
+```
+# Discussion Analysis
+
+## Look at benefits first individuals
+
+

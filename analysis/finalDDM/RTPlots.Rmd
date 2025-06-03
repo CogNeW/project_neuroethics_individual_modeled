@@ -1,0 +1,61 @@
+---
+title: "RT Plots"
+output: html_notebook
+---
+
+This script will relate the DDM parameters for each subject with their ideological variables.
+
+# Libraries
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(data.table)
+# Load necessary library
+library(ggplot2)
+```
+
+# Plotting Reaction time Distributions
+
+```{r}
+# Calculate the mean and standard error (SE) for each gain value
+average_data <- risk_data %>%
+  group_by(gain) %>%
+  summarize(
+    mean_rt = mean(rt, na.rm = TRUE),
+    se_rt = sd(rt, na.rm = TRUE) / sqrt(n())  # Standard error
+  )
+
+# Create the plot showing the average line with error bars
+ggplot(average_data, aes(x = gain, y = mean_rt)) +
+  geom_line(color = "red", size = 1) +                # Add red line for the average
+  geom_errorbar(aes(ymin = mean_rt - se_rt, ymax = mean_rt + se_rt), 
+                width = 0.2, color = "black") +       # Add error bars
+  labs(x = "Gain", y = "Average Reaction Time (RT)", title = "Average Gain vs Reaction Time with Error Bars") +
+  geom_smooth(method="lm") +
+  theme_minimal()                                    # Use a minimal theme
+ 
+```
+
+```{r}
+# Filter the data to include only rows where experimental_treatment_selected is "Yes to treatment"
+filtered_data <- risk_data %>%
+  filter(experimental_treatment_selected == "Yes to treatment")
+
+# Calculate the mean and standard error (SE) for each gain value
+average_data <- filtered_data %>%
+  group_by(gain) %>%
+  summarize(
+    mean_rt = mean(rt, na.rm = TRUE),
+    se_rt = sd(rt, na.rm = TRUE) / sqrt(n())  # Standard error
+  )
+
+# Create the plot showing the average line with error bars and horizontal caps
+ggplot(average_data, aes(x = gain, y = mean_rt)) +
+  geom_line(color = "red", size = 1) +                # Add red line for the average
+  geom_errorbar(aes(ymin = mean_rt - se_rt, ymax = mean_rt + se_rt), 
+                width = 0.1, color = "black") +       # Add error bars with horizontal caps
+  labs(x = "Gain", y = "Average Reaction Time (RT)", title = "Average Gain vs Reaction Time (Filtered)") +
+  theme_minimal()                                    # Use a minimal theme
+```
+

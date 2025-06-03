@@ -1,0 +1,919 @@
+---
+title: "paper1"
+author: "Kianté Fernandez"
+date: "10/13/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(GGally)
+library(reshape2)
+library(psych)
+library(car)
+library(knitr)
+library(broom)
+library(tidyverse)
+library(kableExtra)
+library(scales)
+library(outliers)
+library(sjPlot)
+library(report) #devtools::install_github("easystats/report")
+library(emmeans)
+library(lme4)
+library(lmerTest)
+library(pairwiseComparisons)
+library(here)
+library(doParallel)
+library(ggpubr)
+library(gghalves)
+```
+This script contains analyses supporting the manuscript:
+"Prospect Theory and Judgments About Cognitive Enhancement"
+by Kianté Fernandez and John Medaglia
+
+This script was prepared by Kianté Fernandez.
+
+Last modified by Kianté Fernandez on 12/22/2020.
+
+```{r load in clean data}
+load(here("data", "Cleaned_Pilot","exclusions.2020.10.21.RData"))
+
+Neuroethics_Judgement <- read.csv(here::here("data", "Cleaned_Pilot", "clean_data_long.csv"), stringsAsFactors=TRUE)
+```
+
+```{r selected variabless of intrest, echo=FALSE}
+# Disable scientific notation
+#options(scipen=999)
+Neuroethics_Judgement %>% 
+ dplyr::select(user_id, condition, Risk_Beta, Gain_Beta, marginal.effect.risk, marginal.effect.gain, marginal.effect.P.risk , marginal.effect.P.gain, Nagelkerke_R2, Yes, No, age, sex, Income, education, race_ethnicity, task_completed) %>% 
+  mutate(marginal.effect.P.risk = ifelse(marginal.effect.P.risk < 0.05, "significant", "not_significant" )) %>% 
+  mutate(marginal.effect.P.gain = ifelse(marginal.effect.P.gain < 0.05, "significant", "not_significant" )) %>% 
+  mutate(dominate = ifelse(Yes >= 75 *.90 | No >= 75 *.90, "dominate", "not_dominate")) %>% 
+  filter(!dominate == "dominate") %>% 
+  distinct() -> data.h
+  #filter(!user_id == "sJJuXw52") %>% 
+  #filter(!user_id == "cR3c5iQJ") %>% 
+  #filter(!user_id == "Zg8wzJ7p")
+```
+
+#Paper 1
+
+```{r demographics, include=FALSE}
+#calculate the descriptives
+Neuroethics_Judgement %>% 
+  dplyr::select(user_id, sex, age, race_ethnicity, education, Income, time2completion, task_completed, Yes, No) %>% 
+  mutate(dominate = ifelse(Yes >= 75 *.90 | No >= 75 *.90, "dominate", "not_dominate")) %>% 
+  filter(!dominate == "dominate") %>% 
+  distinct() -> demographics
+#sex
+n.female <- nrow(demographics[which(demographics$sex=="Female"),])
+n.male <-   nrow(demographics[which(demographics$sex=="Male"),])
+n.other<-   nrow(demographics[which(demographics$sex=="Other"),])
+#age
+minage <- min(demographics$age,na.rm=T)
+maxage<- max(demographics$age,na.rm=T)
+mage <- round(mean(demographics$age,na.rm=T),2)
+sdage <- round(sd(demographics$age,na.rm=T),2)
+#race ethnicity
+n.white <- nrow(demographics[which(demographics$race_ethnicity=='White'),])
+n.black <- nrow(demographics[which(demographics$race_ethnicity=='Black'),])
+n.asian <- nrow(demographics[which(demographics$race_ethnicity=='Asian'),])
+n.hispanic <-  nrow(demographics[which(demographics$race_ethnicity=='Hispanic or Latino'),])
+n.othereth <-  nrow(demographics[which(demographics$race_ethnicity=='Other'),])+
+  nrow(demographics[which(demographics$race_ethnicity=='Mixed'),])
+n.pacific <-  nrow(demographics[which(demographics$race_ethnicity=='Native Hawaiian/Pacific Islander'),])
+n.aindian <-  nrow(demographics[which(demographics$race_ethnicity=='American Indian/Alaska Native'),])
+n.notreported  <-  nrow(demographics[which(demographics$race_ethnicity=='Prefer not to say'),])
+#education
+n.HighSchool    <- nrow(demographics[which(demographics$education=="HighSchool"),])
+n.Undergraduate <-   nrow(demographics[which(demographics$education=="Undergraduate"),])
+n.Postgraduate  <-   nrow(demographics[which(demographics$education=="Postgraduate"),])
+#income
+minincome <- min(demographics$Income,na.rm=T)
+maxincome<- max(demographics$Income,na.rm=T)
+medincome <- round(median(demographics$Income,na.rm=T),2)
+IQRincome <- round(IQR(demographics$Income, na.rm = T),2)
+
+#task 
+mtask <- round(mean(demographics$task_completed,na.rm=T),2)
+sdtask <- round(sd(demographics$task_completed,na.rm=T),2)
+
+#survey
+msurvey <- round(mean(demographics$time2completion,na.rm=T),2)
+sdsurvey <- round(sd(demographics$time2completion,na.rm=T),2)
+
+#trials
+mtrial <- round(mean(Neuroethics_Judgement$rt,na.rm=T),2)
+sdtrial <- round(sd(Neuroethics_Judgement$rt,na.rm=T),2)
+
+#yes
+myes <- round(mean(demographics$Yes,na.rm=T),0)
+sdyes <- round(sd(demographics$Yes,na.rm=T),0)
+
+#No
+mno <- round(mean(demographics$No,na.rm=T),0)
+sdno <- round(sd(demographics$No,na.rm=T),0)
+
+sample <- length(demographics$user_id)
+excluded <-  616-sample
+
+exlclusion_rate <- round(excluded/616*100,1)
+```
+
+
+## Participants
+
+A total of 616 participants were recruited from Amazon Mechanical Turk (MTurk). MTurk allows researchers to collect high-quality data rapidly among demographically diverse individuals \cite{buhrmesterAmazonMechanicalTurk2011}. Prior work has shown that MTurk can be reliably used to make inferences about a number of broader populations of interest \cite{coppockGeneralizingSurveyExperiments2019, huffWhoAreThese2015, johnsonAmazonMechanicalTurk2020}. The participants were required to be located within the United States, over the age of 18, fluent in English. While limitations apply the MTurk studies (see Limitations in the Discussion), studies have shown that the quality of MTurk responses can improve with \textit{a priori} researcher constraints \cite{peerReputationSufficientCondition2014, cheungAmazonMechanicalTurk2017, thomasValidityMechanicalTurk2017}. In the current study, we required that participants had previously completed at least 100 tasks and maintained at least a 95\% approval rating on MTurk. We additionally applied exclusions to further ensure that we analyzed high-quality behavioral data (see Exclusions). Our final sample was `r sample`participants.The total sample consisted of `r n.female` females, $M_{age}$ = `r mage` years of age ($SD_{age}$ = `r sdage`), with `r n.HighSchool` high school, `r n.Undergraduate` undergraduate, and `r n.Postgraduate` postgraduate, and identified as White/Caucasian (*n* = `r n.white`), Asian (*n* = `r n.asian`), Hispanic/Latino (*n* = `r n.hispanic`), Black/African American (*n* = `r n.black`), Pacific Islander (*n* = `r n.pacific`) other/multiple (*n* = `r n.othereth`), or did not disclose their ethnicity (*n* = `r n.notreported`). The included subjects completed the task in an average of $M_{task}$ = `r mtask` minutes ($SD_{task}$ = `r sdtask`) and the survey in an average of $M_{survey}$ = `r msurvey` minutes ($SD_{survey}$ = `r sdsurvey`).
+
+## Exlclusion Criteria
+
+In line with recommendations for studies conducted using Amazons Mechanical Turk (AMT) service, careful instructions and \textit{a priori} exclusion criteria were applied to further ensure data quality \cite{crumpEvaluatingAmazonMechanical2013}. Using a multi-method approach to detect careless/invalid responses in online samples, several data exclusion criteria were applied \cite{curranMethodsDetectionCarelessly2016}. A total of `r excluded` participants were excluded. Participants single trials were excluded if response times were either 250 milli-seconds or above 90 seconds. Given that participants had ample time to respond to each question (up to as long until they made a decision), we reasoned that these participants were not devoting sufficient attention to the task. Additionally, having considered trial wise exclusions, participants were also excluded for failure to complete at least 40 trials in the specified range. Finally, participants were excluded for failure of passing four attention check items and a total survey completion time below five minutes. Because our survey battery involved 11 different assessments, we reasoned that a total completion time below five minutes reflected a careless responder. Our overall exclusion rate of `r exlclusion_rate`\% is well in line with research findings studying quality control measures on MTurk \cite{crumpEvaluatingAmazonMechanical2013, downsAreYourParticipants2010, paolacciTurkUnderstandingMechanical2014}.
+
+*Data analytic exclusions*
+We decided in advance chose to exclude the 5\% of participants with the poorest model fit based on Nagelkerke’s $R^2$ (see also \cite{walasekHowMakeLoss20141208, walasekContextdependentSensitivityLosses20181025}, with the objective of removing participants who responded most randomly and inconsistently. Lastly, participants were excluded for selecting a “yes” or “no” response at least 90\% of the total number of trials. These patterns of stereotyped responses preclude the ability to estimate reliable coefficients in our statistical models. Furthermore, they could result from individuals who are not responding to the information presented on screen during the task. None of the analyses reported yields qualitatively different results if all participants’ data are retained.
+
+
+```{r demographic tables}
+paste(report_participants(demographics, spell_n = TRUE))
+```
+
+```{r}
+demographics %>% 
+  na.omit() %>% 
+  dplyr::select(sex, age, race_ethnicity, education, Income) %>% 
+  gtsummary::tbl_summary(by = education) %>% 
+   gtsummary::add_n() %>%
+   gtsummary::as_gt()
+
+demographics %>% 
+  select(user_id,No) %>% 
+  mutate(Noers = ifelse(No > 75/2, 1,0)) %>% 
+  janitor::tabyl(Noers) %>% 
+  janitor::adorn_pct_formatting(digits = 0, affix_sign = TRUE)
+```
+
+The average trial completion time was $M_{trial}$ = `r mtrial` ($SD_{trial}$ = `r sdtrial`). Participants were mostly unwilling to choose a treatment. Overall, the average rejection probability across subjects was $M_{No}$ = `r mno` ($SD_{No}$ = `r sdno`), with 73\% of participants being more likely to select no treatment than a treatment. 
+
+
+##Risk, benefit marginal effects for each cog domain
+```{r echo=FALSE, dpi= 300}
+data.h %>% 
+  dplyr::select(user_id, condition, marginal.effect.risk, marginal.effect.gain) %>% 
+  reshape2::melt(id = c("user_id", "condition") , variable.name = "type", value.name = "marginal.effect") -> test
+
+ggplot(test, aes(condition, marginal.effect, fill = condition))+
+  geom_half_violin(side = "r") +
+  geom_half_point(side = "l", alpha=0.5, transformation = position_jitter(width = .15))+
+  coord_flip()+
+  theme_minimal()+
+   labs(title = "Average Marginal Effect by Cognitive Domain",
+       subtitle = "",
+       x = "Cognitive Domain", 
+       y = "Marginal Effect",
+       color = "")+theme(legend.position = "none")+
+       facet_wrap(~ type, scale = "free_y", nrow = 2)
+
+plotdata <- test %>%
+  group_by(type, condition) %>%
+  summarize(n = n(),
+            median = median(marginal.effect),
+            mean = mean(marginal.effect),
+            sd = sd(marginal.effect),
+            se = sd/sqrt(n),
+            ci = qt(0.975, df = n - 1) * sd / sqrt(n)) %>% na.omit()
+
+knitr::kable(plotdata[1:7,], caption = "Descriptives for Risk by Cog domain")%>%  
+  kable_styling(latex_options = "hold_position")
+knitr::kable(plotdata[8:14,], caption = "Descriptives for Gain by Cog domain")%>%  
+  kable_styling(latex_options = "hold_position")
+
+data.h %>% 
+  dplyr::select(user_id, marginal.effect.gain) %>% 
+  ggplot(aes(marginal.effect.gain))+ 
+  geom_histogram(fill = "deepskyblue",
+                 color="black",
+                 bins = 60)+theme_bw()
+data.h %>% 
+  dplyr::select(user_id, marginal.effect.risk) %>% 
+  ggplot(aes(marginal.effect.risk))+ 
+  geom_histogram(fill = "indianred3",
+                 color="black",
+                 bins = 60)+theme_bw()
+
+data.h %>% 
+  dplyr::select(user_id, marginal.effect.risk, marginal.effect.gain) %>% 
+  mutate(marginal.effect.risk = marginal.effect.risk) %>% 
+  melt(id = c("user_id"), variable.name = "type", value.name = "marginal.effect") %>% 
+  ggplot(aes(marginal.effect, fill=type)) + geom_histogram(color="black",bins = 60, alpha = .8)+theme_bw()+
+  theme(legend.position="none") +
+  facet_wrap(~ type, scale = "free_y", nrow = 2) + 
+  geom_vline(xintercept = 0, linetype="dashed", size=1.5)
+```
+
+**##Statistical test for risk vs. benefit**
+```{r testing for risk & benefit difference}
+data.h %>% 
+  dplyr::select(user_id, condition, marginal.effect.risk, marginal.effect.gain, Yes, No) %>% 
+  mutate(marginal.effect.risk = log(abs(marginal.effect.risk+1))) %>% 
+  mutate(marginal.effect.gain = log(abs(marginal.effect.gain+1))) %>% 
+ #mutate(marginal.effect.risk = -1 * marginal.effect.risk) %>% 
+  reshape2::melt(id = c("user_id", "condition", "Yes", "No") , variable.name = "type", value.name = "marginal.effect") -> test 
+
+#note that the results do not change when I remove the outlier
+
+test$user_id <- factor(test$user_id)
+
+t <- t.test(marginal.effect ~ type,  paired = TRUE, alternative = "two.sided", conf.level = 0.95,var.equal = F, data =test)
+tab <- map_df(list(t), tidy)
+knitr::kable(tab[c("estimate", "statistic", "p.value", "parameter", "conf.low", 
+"conf.high", "method")], caption = "Parired T-test")%>%  
+  kable_styling(latex_options = "hold_position")
+# plot
+ggstatsplot::ggwithinstats(
+  data = test,
+  x = type,
+  y = marginal.effect,
+  title = "Paired T-test of log transformed absolute value of the marginal effects",
+  subtitle = "log transformed absolute value of the marginal effects",
+  caption = "",
+  ggstatsplot.layer = FALSE,
+  point.path = F,
+  mean.plotting = F
+)
+
+test %>% 
+  group_by(type) %>% 
+  summarise(
+    median = median(marginal.effect),
+    mean = mean(marginal.effect),
+    sd = sd(marginal.effect)
+  )
+#effectsize::t_to_d(-2.4246,423, paired = T)
+```
+The Paired t-test suggests that the difference of marginal.effect between gains and losses (mean of the differences =  -0.000719878) is significant (difference = , 95% CI [-0.0013034596, -0.0001362965], t(424) = -2.425, p < .05) and can be considered as small (Hedge's g = -0.12).
+
+Results thus indicate a slight but significant preference for gains (M = 0.003030959, SD = 0.004875783) over losses (M = 0.002311081, SD = 0.004647267).
+
+**##Interdomain stability**
+```{r cog domain h2, echo=FALSE}
+aov.1 <- stats::oneway.test(log(abs(marginal.effect.risk+1)) ~ condition, data = data.h, var.equal= F)
+aov.2 <- stats::oneway.test(log(abs(marginal.effect.gain+1))~ condition, data = data.h, var.equal= F)
+
+# plot
+ggstatsplot::ggbetweenstats(data = data.h,
+  x = condition,
+  y = marginal.effect.risk,
+  title = "Distribution of average marginal effects for risks across cognitive domain"
+)+theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# plot
+ggstatsplot::ggbetweenstats(
+  data = data.h,
+  x = condition,
+  y = marginal.effect.gain,
+  title = "Distribution of average marginal effects for gains across cognitive domain"
+)+ theme(axis.text.x = element_text(angle = 45, hjust = 1))
+#create a table 
+tab <- map_df(list(aov.1,aov.2), tidy)
+knitr::kable(tab[c("num.df", "den.df", "statistic", "p.value", "method")], caption = "one way anova testing cognitve domain; (Risk and Gain)")%>%  
+  kable_styling(latex_options = "hold_position")
+```
+An analysis of variance showed that the effect of cognitive domain for losses was not significant, F(6, 371) = 0.36, p = 0.902 and can be considered as very small (partial omega squared = -0.01).
+
+An analysis of variance showed that the effect of cognitive domain for gains was not significant, F(6, 371) = 0.85, p = 0.529 and can be considered as very small (partial omega squared = -0.01).
+
+**##Do people use nonlinear weighting of probabilities?**
+```{r cor h3 analysis}
+Neuroethics_Judgement %>% 
+  group_by(user_id) %>% 
+  mutate(pearson.corr = cor(risk, gain, method = "pearson")) %>% 
+  ungroup(user_id) %>% 
+  dplyr::select(user_id, condition, risk, gain, experimental_treatment_selected, Yes, No, pearson.corr) %>% 
+   mutate(experimental_treatment_selected = ifelse(experimental_treatment_selected == "Yes to treatment", 1, 0)) -> test
+
+continuous <- c("risk", "gain", "pearson.corr")
+
+test[,continuous] <- scale(test[,continuous])  
+#model 1 only linear terms
+#cl <- makePSOCKcluster() #use parallel processing
+
+registerDoParallel() #use parallel processing
+#start with risk, and gain
+m.1 <- glmer(experimental_treatment_selected ~ pearson.corr + risk + gain  +
+               (risk + gain + I(gain^2) + I(risk^2)| user_id), 
+             data = test, family = binomial(link="logit"), 
+             control=glmerControl(optimizer="bobyqa"),
+             nAGQ = 0)
+
+#add poly gain
+m.2 <- glmer(experimental_treatment_selected ~ pearson.corr + risk + gain + I(gain^2) +
+               (risk + gain + I(gain^2) + I(risk^2)| user_id), 
+             data = test, family = binomial(link="logit"), 
+             control=glmerControl(optimizer="bobyqa"),
+             nAGQ = 0)
+#just add poly risk 
+m.3 <- glmer(experimental_treatment_selected ~ pearson.corr + risk + gain + I(gain^2) + I(risk^2) + 
+               (risk + gain + I(gain^2) + I(risk^2)| user_id), 
+             data = test, family = binomial(link="logit"), 
+             control=glmerControl(optimizer="bobyqa"),
+             nAGQ = 0)
+#linear interaction
+m.4 <-  glmer(experimental_treatment_selected ~ pearson.corr + 
+                risk + gain + 
+                I(gain^2) + I(risk^2) + 
+                risk:gain + 
+                (risk + gain + I(gain^2) + I(risk^2)| user_id), 
+              data = test, family = binomial(link="logit"), 
+              control=glmerControl(optimizer="bobyqa"),
+              nAGQ = 0)
+#add risk gain^2 interaction
+m.5 <-  glmer(experimental_treatment_selected ~ pearson.corr + 
+                risk + gain +
+                I(risk^2) + I(gain^2)+
+                risk:gain+
+                risk:I(gain^2) +
+                (risk + gain + I(gain^2) + I(risk^2)| user_id), 
+              data = test, family = binomial(link="logit"), 
+              control=glmerControl(optimizer="bobyqa"),
+              nAGQ = 0)
+#add gain risk^2 interaction
+m.6 <-  glmer(experimental_treatment_selected ~ pearson.corr + 
+                risk + gain +
+                I(risk^2) + I(gain^2)+
+                risk:gain+
+                risk:I(gain^2) +
+                gain:I(risk^2) + 
+                (risk + gain + I(gain^2) + I(risk^2)| user_id), 
+              data = test, family = binomial(link="logit"), 
+              control=glmerControl(optimizer="bobyqa"),
+              nAGQ = 0)
+#add last interaction
+m.7 <-  glmer(experimental_treatment_selected ~ pearson.corr + 
+                risk + gain +
+                I(risk^2) + I(gain^2)+
+                risk:gain+
+                risk:I(gain^2) +
+                gain:I(risk^2) + 
+                I(risk^2):I(gain^2)+
+                (risk + gain + I(gain^2) + I(risk^2)| user_id), 
+              data = test, family = binomial(link="logit"), 
+              control=glmerControl(optimizer="bobyqa"),
+              nAGQ = 0)
+
+table <-anova(m.1, m.2, m.3, m.4, m.5, m.6, m.7, type = "LRT")
+tab <- map_df(list(table), tidy)
+options(knitr.kable.NA = '')
+knitr::kable(tab[c("term", "npar", "AIC", "BIC", "logLik", "deviance", "statistic", 
+                   "df", "p.value")], caption = "Model Comparison")%>%  
+  kable_styling(latex_options = "hold_position")
+##
+#Anova(m.6, type = "III")
+ggeffects::ggpredict(m.6, terms=c("risk [all]", "gain [all]"))
+ggeffects::ggpredict(m.6, terms=c("gain [all]", "risk"))
+
+stopImplicitCluster()
+```
+
+```{r cor sensitivity analysis plots}
+# Step 1: Call the pdf command to start the plot
+pdf(file = here("images","h3_effect_plots.pdf"),  # The directory you want to save the file in
+    width = 10, # The width of the plot in inches
+    height = 6) # The height of the plot in inches
+# colors = "bw"
+# Step 2: Create the plot with R code
+
+p1 <- plot(ggeffects::ggpredict(m.6, terms=c("risk [all]", "gain")))+ 
+  geom_hline(yintercept = .50)+
+  labs(
+    x = "Risk", 
+    y = "Probability of selecting treatment", 
+    title = ""
+  )+
+  scale_x_continuous(limits = c(-1.61, 2))+
+  scale_y_continuous(limits = c(.25,.75))
+
+p2 <- plot(ggeffects::ggpredict(m.6, terms=c("gain [all]", "risk")))+ 
+  geom_hline(yintercept = .50)+
+   labs(
+    x = "Gain", 
+    y = "Probability of selecting treatment", 
+    title = ""
+  )+
+  scale_x_continuous(limits = c(-1.61, 2))+
+  scale_y_continuous(limits = c(.25,.75))
+
+ggarrange(p1, p2, 
+          labels = c("A", "B"),
+          ncol = 2, nrow = 1)
+# Step 3: Run dev.off() to create the file!
+dev.off()
+
+# Step 1: Call the pdf command to start the plot
+pdf(file = here("images","h3_model.pdf"),  # The directory you want to save the file in
+    width = 8, # The width of the plot in inches
+    height = 6) # The height of the plot in inches
+# colors = "bw"
+# Step 2: Create the plot with R code
+ggstatsplot::ggcoefstats(m.6,
+point.args = list(color = "red", size = 3, shape = 15),
+  vline.args = list(size = 1, color = "#CC79A7", linetype = "dotdash"),
+  title = "Logistic mixed model predicting experimental treatment selected",
+  ggstatsplot.layer = TRUE
+) +
+  ggplot2::scale_y_discrete(labels = c("Pearson correlation covariate", "Risk term", "Gain term", "Quadratic risk term", "Quadratic gain term", "Interaction: risk & gain", "Interaction: risk & quadratic gain", "Interaction: gain & quadratic risk"))
+# Step 3: Run dev.off() to create the file!
+dev.off()
+
+#model table
+parameters::model_parameters(m.6) %>% 
+  filter(!Parameter == "(Intercept)")->x
+kable(x[c("Parameter", "Coefficient", "SE", "CI_low", "CI_high", "z", "p")])%>%  
+  kable_styling(latex_options = "hold_position")
+```
+
+**Table 1:** main effects across all models with correlation included in model
+```{r printLM table corr included, echo=FALSE}
+tab_model(m.1, m.2, m.3,m.4, m.5, m.6,
+          digits = 4, 
+          show.df = T, 
+          show.stat = T, 
+          string.pred = "Ind. Variable", 
+          col.order = c("est","ci","df","stat","p"), 
+          dv.labels = c("Model 1", "Model 2","Model 3", "Model 4", "Model 5","Model 6")
+          )
+```
+*Note:* Standardized parameters were obtained by fitting the model on a standardized version of the dataset. 95% Confidence Intervals (CIs) and p-values were computed using the Wald approximation.
+
+
+#Individual Differences
+
+Note I have run these without the outliers and with; no difference. 
+##**Age**
+
+```{r age data, echo=FALSE}
+data.h %>% 
+  mutate(marginal.effect.risk = log(abs(marginal.effect.risk + 1))) %>% 
+  mutate(marginal.effect.gain = log(abs(marginal.effect.gain + 1))) %>% 
+  mutate(YN_diff = Yes - No, user_id = factor(user_id), age = 1/age) %>% 
+  dplyr::select(marginal.effect.risk, marginal.effect.gain, age, YN_diff) %>%
+  na.omit() -> data.age
+#ggpairs(data.age)
+```
+
+```{r age ploting, echo=FALSE}
+a1 <- ggplot(data.age, aes(x=age, y=marginal.effect.risk)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point() + 
+    labs(x = "Age", 
+       y = "Risk", 
+       title  = "log transformed absolute value of the marginal effects of Risk by Age")+
+      theme_minimal()
+
+a2 <- ggplot(data.age, aes(x=age, y=marginal.effect.gain)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "blue") +
+    geom_point() +
+    labs(x = "Age", 
+       y = "Gain", 
+       title  = "log transformed absolute value of the marginal effects by Gain by Age")+
+      theme_minimal()
+
+ggarrange(a1, a2, 
+          labels = c("A", "B"),
+          ncol = 2, nrow = 1)
+```
+
+```{r age modeling}
+#risk 
+lm(marginal.effect.risk ~ age, data.age) %>% 
+  gtsummary::tbl_regression()
+
+#gain 
+lm(marginal.effect.gain ~ age, data.age) %>% 
+  gtsummary::tbl_regression()
+```
+
+**We did not find any individual differenece in risk or gain as a function of age**
+
+
+##**Education**
+```{r education data, echo=FALSE}
+data.h %>% 
+  filter(! user_id == "RU3gTWzp") %>% #we only have a single subject less than high school 
+  mutate(marginal.effect.risk = log(abs(marginal.effect.risk + 1))) %>% 
+  mutate(marginal.effect.gain = log(abs(marginal.effect.gain + 1))) %>% 
+  mutate(YN_diff = Yes - No, user_id = factor(user_id), education = factor(education)) %>% 
+  dplyr::select(user_id, marginal.effect.risk, marginal.effect.gain, education, YN_diff) -> data.education
+```
+
+```{r education plotting}
+education <- data.education %>%
+  group_by(education) %>%
+  summarize(n = n(),
+         mean = mean(marginal.effect.risk),
+         sd = sd(marginal.effect.risk),
+         se = sd / sqrt(n),
+         ci = qt(0.975, df = n - 1) * sd / sqrt(n))
+knitr::kable(education, caption = "Descriptives for risk by education")%>%  
+  kable_styling(latex_options = "hold_position")
+
+# plot the means and standard errors
+ggplot(education, 
+       aes(x = education, 
+           y = mean, 
+           color = education,
+           group = 1)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean - se, 
+                    ymax = mean + se), 
+                width = .1)+
+    labs(x = "Education", 
+       y = "Mean", 
+       title  = "Risk by Education")+
+    theme_minimal()
+
+education <- data.education %>%
+  group_by(education) %>%
+  summarize(n = n(),
+         mean = mean(marginal.effect.gain),
+         sd = sd(marginal.effect.gain),
+         se = sd / sqrt(n),
+         ci = qt(0.975, df = n - 1) * sd / sqrt(n))
+knitr::kable(education, caption = "Descriptives for gain by education")%>%  
+  kable_styling(latex_options = "hold_position")
+
+
+# plot the means and standard errors
+ggplot(education, 
+       aes(x = education, 
+           y = mean,
+       color = education,
+           group = 1)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean - se, 
+                    ymax = mean + se), 
+                width = .1) +
+   labs(x = "Education", 
+       y = "Mean", 
+       title  = "Gain by Education")+
+    theme_minimal()
+
+
+###both in one graph
+data.education %>% 
+  dplyr::select(education, marginal.effect.risk, marginal.effect.gain) %>% 
+  mutate(marginal.effect.risk = -marginal.effect.risk) %>% 
+  reshape2::melt(id = "education" , variable.name = "type", value.name = "beta") -> plotdata
+
+education <- plotdata %>%
+  group_by(education, type) %>%
+  summarize(n = n(),
+            mean = mean(beta),
+            sd = sd(beta),
+            se = sd/sqrt(n))
+
+pd <- position_dodge(0.2)
+ggplot(education, 
+       aes(x = factor(education, 
+                      labels = c("High School",
+                                 "Undergraduate",
+                                 "Postgraduate")), 
+           y = mean, 
+           group=type, 
+           color=type)) +
+  geom_point(position=pd, 
+             size = 3)  +
+  geom_errorbar(aes(ymin = mean - se, 
+                    ymax = mean + se), 
+                width = .1, 
+                position = pd, 
+                size = 1) +
+  #scale_y_continuous(label = scales::dollar) +
+  scale_color_brewer(palette="Set1") +
+  theme_minimal() +
+  labs(title = "log transformed absolute value of the average marginal effects by type and eduation",
+       subtitle = "(mean +/- standard error)",
+       x = "", 
+       y = "",
+       color = "Attribute")
+```
+
+```{r education modeling}
+#risk 
+lm.education.risk <- lm(marginal.effect.risk ~ education, data.education)
+
+#create table for the output
+tab <- map_df(list(lm.education.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Categorical Education")%>%  
+  kable_styling(latex_options = "hold_position")
+
+#pairwise comparisons
+emm = emmeans(lm.education.risk, ~ education)
+p <- pairs(emm)
+
+tab <- map_df(list(p), tidy)
+knitr::kable(tab[c("contrast", "estimate", "std.error", 
+"df", "statistic", "adj.p.value")], caption = "pairwise comparaisions of average marginal effects for risk by education")%>%  
+  kable_styling(latex_options = "hold_position")
+
+#gain
+lm.education.gain <- lm(marginal.effect.gain ~ education, data.education)
+
+#create table for the output
+tab <- map_df(list(lm.education.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Gain given Categorical Education")%>%  
+  kable_styling(latex_options = "hold_position")
+
+
+emm = emmeans(lm.education.gain, ~ education)
+p <- pairs(emm)
+
+tab <- map_df(list(p), tidy)
+knitr::kable(tab[c("contrast", "estimate", "std.error", 
+"df", "statistic", "adj.p.value")], caption = "pairwise comparaisions of average marginal effects for gain by education")%>%  
+  kable_styling(latex_options = "hold_position")
+
+data.education %>% 
+  dplyr::select(education, marginal.effect.risk, marginal.effect.gain, YN_diff) %>% 
+  reshape2::melt(id = c("education", "YN_diff") , variable.name = "type", value.name = "marginal_effect") -> test
+
+lm.education <- lm(marginal_effect~ type*education, test)
+
+tab <- map_df(list(lm.education), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting AME given R/B and education")%>%  
+  kable_styling(latex_options = "hold_position")
+
+plot(ggeffects::ggpredict(lm.education, terms= c("education", "type")))
+```
+
+WE found a significant difference between high school and postgrad 
+
+##**Income**
+```{r income data,  echo=FALSE}
+data.h %>% 
+  dplyr::select(user_id, marginal.effect.risk, marginal.effect.gain, Income, Yes, No) %>% 
+  filter(!Income == 0) %>% 
+  mutate(marginal.effect.risk = log(abs(marginal.effect.risk + 1))) %>% 
+  mutate(marginal.effect.gain = log(abs(marginal.effect.gain + 1))) %>% 
+  mutate(YN_diff = Yes - No, user_id = factor(user_id), Income = log(Income)) %>% 
+  na.omit() %>% 
+  dplyr::select(marginal.effect.risk, marginal.effect.gain, Income, YN_diff) -> data.income
+```
+
+```{r income plotting}
+I1 <- ggplot(data.income, aes(x=Income, y=marginal.effect.risk)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point()+  
+    labs(x = "Log Income", 
+       y = "log transformed absolute value of the average marginal effect", 
+       title  = "Risk by Income")
+I2 <- ggplot(data.income, aes(x=Income, y=marginal.effect.gain)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "blue") +
+    geom_point()+
+    labs(x = "Log Income", 
+       y = "log transformed absolute value of the average marginal effect", 
+       title  = "Gain by Income")
+ggarrange(I1, I2, 
+          labels = c("A", "B"),
+          ncol = 2, nrow = 1)
+```
+
+```{r income modeling}
+#risk 
+lm(marginal.effect.risk ~ Income, data.income)%>% 
+  gtsummary::tbl_regression()
+
+#gain 
+lm(marginal.effect.gain ~Income, data.income) %>% 
+  gtsummary::tbl_regression()
+```
+
+**We did not find any individual differenece in risk or gain as a function of log Income**
+
+##**Sex**
+```{r sex data, echo = FALSE}
+data.h %>% 
+  filter(! sex == "Other") %>%# only have 3 people who reported other as sex
+  mutate(marginal.effect.risk = log(abs(marginal.effect.risk + 1))) %>% 
+  mutate(marginal.effect.gain = log(abs(marginal.effect.gain + 1))) %>% 
+  mutate(YN_diff = Yes - No, sex = factor(sex)) %>% 
+  na.omit() %>% 
+  dplyr::select(marginal.effect.risk, marginal.effect.gain, sex, YN_diff) -> data.sex
+```
+
+```{r sex plotting}
+sex <- data.sex %>%
+  group_by(sex) %>%
+  summarize(n = n(),
+         mean = mean(marginal.effect.risk),
+         sd = sd(marginal.effect.risk),
+         se = sd / sqrt(n),
+         ci = qt(0.975, df = n - 1) * sd / sqrt(n))
+knitr::kable(sex, caption = "Descriptives for risk by sex")%>%  
+  kable_styling(latex_options = "hold_position")
+
+###both in one graph
+data.sex %>% 
+  dplyr::select(sex, marginal.effect.risk, marginal.effect.gain) %>% 
+  mutate(marginal.effect.risk = -marginal.effect.risk) %>% 
+  reshape2::melt(id = "sex" , variable.name = "type", value.name = "beta") -> plotdata
+
+sex <- plotdata %>%
+  group_by(sex, type) %>%
+  summarize(n = n(),
+            mean = mean(beta),
+            sd = sd(beta),
+            se = sd/sqrt(n))
+
+pd <- position_dodge(0.2)
+ggplot(sex, 
+       aes(x = factor(sex, 
+                      labels = c("Male",
+                                 "Female")), 
+           y = mean, 
+           group=type, 
+           color=type)) +
+  geom_point(position=pd, 
+             size = 3) +
+  geom_errorbar(aes(ymin = mean - se, 
+                    ymax = mean + se), 
+                width = .1, 
+                position = pd, 
+                size = 1) +
+  scale_color_brewer(palette="Set1") +
+  theme_minimal() +
+  labs(title = "Mean AME by type and sex",
+       subtitle = "(mean +/- standard error) & reciprocal risk",
+       x = "", 
+       y = "",
+       color = "Attribute")
+```
+
+```{r sex modeling}
+#risk 
+lm.sex.risk <- lm(marginal.effect.risk ~sex, data.sex)
+
+tab <- map_df(list(lm.sex.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Categorical sex")%>%  
+  kable_styling(latex_options = "hold_position")
+
+#gain
+lm.sex.gain <- lm(marginal.effect.gain ~sex, data.sex)
+
+tab <- map_df(list(lm.sex.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Gain given Categorical sex")%>%  
+  kable_styling(latex_options = "hold_position")
+
+#both 
+data.sex %>% 
+  dplyr::select(sex, marginal.effect.risk, marginal.effect.gain, YN_diff) %>% 
+  mutate(marginal.effect.risk = marginal.effect.risk) %>% 
+  reshape2::melt(id = c("sex", "YN_diff") , variable.name = "type", value.name = "marginal_effect") -> test
+
+lm.sex <- lm(marginal_effect~  type*sex, test)
+
+tab <- map_df(list(lm.sex), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting AME given R/B and sex")%>%  
+  kable_styling(latex_options = "hold_position")
+
+plot(ggeffects::ggpredict(lm.sex, terms= c("sex", "type")))
+```
+
+##**Race**
+
+```{r race data}
+data.h %>% 
+  filter(! race_ethnicity == "Prefer not to say") %>%# only have 3 people who reported other as sex
+  mutate(marginal.effect.risk = log(abs(marginal.effect.risk + 1))) %>% 
+  mutate(marginal.effect.gain = log(abs(marginal.effect.gain + 1))) %>% 
+  mutate(YN_diff = Yes - No, race_ethnicity = factor(race_ethnicity)) %>% 
+  na.omit() %>% 
+  dplyr::select(marginal.effect.risk, marginal.effect.gain, race_ethnicity, YN_diff) -> data.race
+
+data.race %>% 
+   mutate(race_ethnicity = fct_recode(data.race$race_ethnicity,
+    "White" = "White",
+    "Non-White" =  "Black",
+    "Non-White" = "Hispanic or Latino",
+    "Non-White" =  "Asian",
+    "Non-White" =  "Native Hawaiian/Pacific Islander",
+    "Non-White"  =  "American Indian/Alaska Native",
+    "Non-White"   =  "Mixed",
+    "Non-White"  =  "Other")) -> data.race
+```
+
+```{r race plotting}
+race <- data.race %>%
+  group_by(race_ethnicity) %>%
+  summarize(n = n(),
+         mean = mean(marginal.effect.risk),
+         sd = sd(marginal.effect.risk),
+         se = sd / sqrt(n),
+         ci = qt(0.975, df = n - 1) * sd / sqrt(n))
+
+knitr::kable(race, caption = "Descriptives for risk by race")%>%  
+  kable_styling(latex_options = "hold_position")
+
+
+###both in one graph
+data.race %>% 
+  dplyr::select(race_ethnicity, marginal.effect.risk, marginal.effect.gain) %>% 
+  mutate(marginal.effect.risk = -marginal.effect.risk) %>% 
+  reshape2::melt(id = "race_ethnicity" , variable.name = "type", value.name = "beta") -> plotdata
+
+race <- plotdata %>%
+  group_by(race_ethnicity, type) %>%
+  summarize(n = n(),
+            mean = mean(beta),
+            sd = sd(beta),
+            se = sd/sqrt(n))
+
+pd <- position_dodge(0.2)
+ggplot(race, 
+       aes(x = factor(race_ethnicity,
+                      labels = c("Non-White",
+                                 "White")), 
+           y = mean, 
+           group=type, 
+           color=type)) +
+  geom_point(position=pd, 
+             size = 3) +
+  geom_errorbar(aes(ymin = mean - se, 
+                    ymax = mean + se), 
+                width = .1, 
+                position = pd, 
+                size = 1) +
+  scale_color_brewer(palette="Set1") +
+  theme_minimal() +
+  labs(title = "Mean AME by type and race",
+       subtitle = "(mean +/- standard error) & reciprocal risk",
+       x = "", 
+       y = "",
+       color = "Attribute")
+```
+
+```{r race modeling}
+#risk 
+lm.race_ethnicity.risk <- lm(marginal.effect.risk ~race_ethnicity, data.race)
+
+tab <- map_df(list(lm.race_ethnicity.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Categorical race_ethnicity")%>%  
+  kable_styling(latex_options = "hold_position")
+
+#gain
+lm.race_ethnicity.gain <- lm(marginal.effect.gain ~race_ethnicity, data.race)
+
+tab <- map_df(list(lm.race_ethnicity.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Gain given Categorical race_ethnicity")%>%  
+  kable_styling(latex_options = "hold_position")
+
+#both 
+data.race %>% 
+  dplyr::select(race_ethnicity, marginal.effect.risk, marginal.effect.gain, YN_diff) %>% 
+  mutate(marginal.effect.risk = marginal.effect.risk) %>% 
+  reshape2::melt(id = c("race_ethnicity", "YN_diff") , variable.name = "type", value.name = "marginal_effect") -> test
+
+lm.race_ethnicity <- lm(marginal_effect~ YN_diff + type*race_ethnicity, test)
+
+tab <- map_df(list(lm.race_ethnicity), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting AME given R/B and race_ethnicity")%>%  
+  kable_styling(latex_options = "hold_position")
+
+plot(ggeffects::ggpredict(lm.race_ethnicity, terms= c("race_ethnicity", "type")))
+```
+
+#mulitple regression
+```{r multiple data}
+
+```
+
+```{r multiple modeling}
+
+```
+
+#suppTable S3 
+
+Generalized linear modeling results using the "lme4" package (R
+version x.X.X; “lme4” version X.X-XX).
+
+For each state the model formula, results and fixed effect terms: 
+```{r supp}
+
+get_model_stuff <- function(model){
+  stuff <- list() 
+  x <- summary(model)
+  formula = x[["call"]]
+  stuff[[1]] = toString(formula)
+  results = broom.mixed::glance(model) %>% select(AIC, BIC, logLik, deviance, df.residual)
+  stuff[[2]] = results
+  terms   = broom.mixed::tidy(model) %>% filter(effect == "fixed") %>% 
+  select(term, estimate, std.error, statistic, p.value)
+  stuff[[3]] = terms
+  return(stuff)
+}
+models <- c(m.1, m.2, m.3, m.4, m.5, m.6, m.7)
+
+models %>% 
+map(get_model_stuff) -> supp
+kable(supp) #we are on to something here! 
+```

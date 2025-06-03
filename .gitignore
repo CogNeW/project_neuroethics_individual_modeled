@@ -1,0 +1,8 @@
+**/*.Rproj.user
+**/*.Rhistory
+**/*.RData
+**/*.Ruserdata
+myenv/
+.Rproj.user
+/analysis/timeDDM/**
+/analysis/timeDDM

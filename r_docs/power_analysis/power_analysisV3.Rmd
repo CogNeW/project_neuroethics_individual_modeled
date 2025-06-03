@@ -1,0 +1,513 @@
+---
+title: "Power_analysis"
+author: "Kianté Fernandez"
+date: "9/29/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load libraries, include=FALSE}
+library(tidyverse)
+library(pwr)
+library(Superpower) # Daniël Lakens power package
+#devtools::install_github("arcaldwell49/Superpower") #to get his package
+library(knitr)
+library(psych)
+library(kableExtra)
+library(effectsize)
+library(broom)
+
+```
+
+```{r load data, message=FALSE, warning=FALSE, include=FALSE}
+# Disable scientific notation
+options(scipen=999)
+
+load("~/Dropbox/Medaglia_RiskBenefit_Neuroethics/Pilot_Data/Study1_Project/RiskBenefit_Neuroethics/data/Cleaned_Pilot/clean.data.2020.09.27.RData")
+
+Neuroethics_Judgement %>% 
+   dplyr::select("user_id", "condition", "marginal.effect.risk", "marginal.effect.gain", "No", "Yes", 
+"consequentialism.score", "BerlinScore", "conservatismFactor", "sex", "age", "education", "ReligionRaised", "ReligionNow", "Religiosity", "Spirituality", "AttendChurch", "ReligiousActivity", "Income", "Political_Party"
+) %>% 
+  filter(!user_id == "RU3gTWzp") %>% #we only have a single subject with less than a high school degee
+  mutate(education = fct_recode(education,
+  HighSchool = "high school degree",
+  Undergraduate = "bachelor",
+  Postgraduate = "masters",
+  Postgraduate = "Doctoral/Professional"
+  )) %>% 
+  filter(!sex == "Other") %>% #we only have 3 subject that identifed as other
+   distinct() -> data.h
+
+religious <- data.matrix(data.h[,c("Religiosity", "Spirituality", "AttendChurch", "ReligiousActivity")]) -1
+religious.efa <- fa(religious, nfactors = 1, rotate = "oblimin", fm ="ml", cor = "poly", scores = "regression")
+data.h$ReligiousFactor<- religious.efa$scores
+```
+
+
+For power, conducting 2 groups of tests using risk sensitivity and benefit sensitivity as the DVs (outcomes):
+#1. Run a model with all ideological/demo vars of interest (centered), obtain eta-squared, then power analysis at 80% power, p = 0.05, on the eta-squared from that model.
+
+Here I use Cohen's $F^2$ as this is what the effect size package `pwr` perfers. After the calculation, I give the appropriate Eta-sqr.
+
+$η_p^2 = \frac{F \times df_{num}}{F \times df_{num} + df_{den}}$
+
+$f_p = \sqrt{\frac{η_p^2}{1-η_p^2}}$
+
+
+
+##Omnibus
+```{r obtain effect size for omnibus, echo=F}
+data.h %>% 
+  dplyr::select(marginal.effect.risk, marginal.effect.gain, No,
+                age, sex, education, Income, conservatismFactor, ReligiousFactor, consequentialism.score,BerlinScore) -> data.multi
+
+center_scale <- function(x) {
+    scale(x, scale = FALSE)
+}
+
+data.multi[,c("No", "age", "Income", "conservatismFactor", "ReligiousFactor", 
+"consequentialism.score", "BerlinScore")] <- 
+  sapply(data.multi[,c("No", "age", "Income", "conservatismFactor", "ReligiousFactor", 
+"consequentialism.score", "BerlinScore")], center_scale)
+
+F.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + age + sex +  education + Income + conservatismFactor + ReligiousFactor + consequentialism.score + BerlinScore, data = data.multi))$fstatistic[1])
+
+numdf.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + age + sex +  education + Income + conservatismFactor + ReligiousFactor + consequentialism.score + BerlinScore, data = data.multi))$fstatistic[2])
+
+dendf.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + age + sex +  education + Income + conservatismFactor + ReligiousFactor + consequentialism.score + BerlinScore, data = data.multi))$fstatistic[3])
+
+f2.risk <- F_to_f(F.risk,numdf.risk,dendf.risk)$Cohens_f_partial
+
+F.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + age + sex +  education + Income + conservatismFactor + ReligiousFactor + consequentialism.score + BerlinScore, data = data.multi))$fstatistic[1])
+
+numdf.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + age + sex +  education + Income + conservatismFactor + ReligiousFactor + consequentialism.score + BerlinScore, data = data.multi))$fstatistic[2])
+
+dendf.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + age + sex +  education + Income + conservatismFactor + ReligiousFactor + consequentialism.score + BerlinScore, data = data.multi))$fstatistic[3])
+
+f2.gain <- F_to_f(F.gain, numdf.gain, dendf.gain)$Cohens_f_partial
+```
+###Risk
+```{r calculate sample size risk, echo=F}
+pwr.risk <- pwr.f2.test(u = numdf.risk, 
+                        v = NULL, 
+                        f2 = f2.risk, 
+                        sig.level = 0.05, 
+                        power = 0.80)
+pwr.risk
+F_to_eta2(F.risk,numdf.risk,dendf.risk)
+
+n = ceiling(pwr.risk$v+numdf.risk+1)
+n
+```
+
+$Y_{AME} = \beta_{0} + \beta_{1}\cdot Age + \beta_{2}\cdot Sex + \beta_{3}\cdot Education + \beta_{4}\cdot Income + \beta_{5}\cdot conservatismFactor + \beta_{6}\cdot ReligiousFactor + \beta_{7}\cdot consequentialism.score +  \beta_{8}\cdot BerlinScore +  \beta_{9}\cdot No$
+
+###Gain
+```{r calculate sample size gain, echo=F}
+pwr.gain <- pwr.f2.test(u = numdf.gain, 
+                        v = NULL, 
+                        f2 = f2.gain, 
+                        sig.level = 0.05, 
+                        power = 0.80)
+
+pwr.gain
+
+F_to_eta2(F.gain, numdf.gain, dendf.gain)
+
+n = ceiling(pwr.gain$v+numdf.gain+1)
+n
+```
+
+#2. Run a model with each ideological/demo var of interest separately, obtain eta-squared, then power each analysis  at 80% power, p = 0.05, on the eta-squared from that model.
+If we use (2.) in the grant, we need a sentence about multiple comparisons.
+
+Here we estimate models for:
+age, sex, education, Income, conservatismFactor, ReligiousFactor, consequentialism.score, BerlinScore, SNS.preference
+
+##age
+```{r obtain effect size for age, echo=F}
+F.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + age, data = data.multi))$fstatistic[1])
+
+numdf.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + age, data = data.multi))$fstatistic[2])
+
+dendf.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + age, data = data.multi))$fstatistic[3])
+
+f2.risk <- F_to_f(F.risk,numdf.risk,dendf.risk)$Cohens_f_partial
+
+F.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + age, data = data.multi))$fstatistic[1])
+
+numdf.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + age, data = data.multi))$fstatistic[2])
+
+dendf.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + age, data = data.multi))$fstatistic[3])
+
+f2.gain <- F_to_f(F.gain, numdf.gain, dendf.gain)$Cohens_f_partial
+```
+
+###Risk
+```{r calculate sample risk age, echo=F}
+pwr.risk <- pwr.f2.test(u = numdf.risk, 
+                        v = NULL, 
+                        f2 = f2.risk, 
+                        sig.level = 0.05, 
+                        power = 0.80)
+pwr.risk
+F_to_eta2(F.risk,numdf.risk,dendf.risk)
+
+n = ceiling(pwr.risk$v+numdf.risk+1)
+n
+```
+###Gain
+```{r calculate sample gain age, echo=F}
+pwr.gain <- pwr.f2.test(u = numdf.gain, 
+                        v = NULL, 
+                        f2 = f2.gain, 
+                        sig.level = 0.05, 
+                        power = 0.80)
+
+pwr.gain
+
+F_to_eta2(F.gain, numdf.gain, dendf.gain)
+
+n = ceiling(pwr.gain$v+numdf.gain+1)
+n
+```
+
+##sex
+```{r obtain effect size for sex, echo =FALSE}
+F.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + sex, data = data.multi))$fstatistic[1])
+
+numdf.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + sex, data = data.multi))$fstatistic[2])
+
+dendf.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + sex, data = data.multi))$fstatistic[3])
+
+f2.risk <- F_to_f(F.risk,numdf.risk,dendf.risk)$Cohens_f_partial
+
+F.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + sex, data = data.multi))$fstatistic[1])
+
+numdf.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + sex, data = data.multi))$fstatistic[2])
+
+dendf.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + sex, data = data.multi))$fstatistic[3])
+
+f2.gain <- F_to_f(F.gain, numdf.gain, dendf.gain)$Cohens_f_partial
+```
+
+###Risk
+```{r calculate sample risk sex, echo=F}
+pwr.risk <- pwr.f2.test(u = numdf.risk, 
+                        v = NULL, 
+                        f2 = f2.risk, 
+                        sig.level = 0.05, 
+                        power = 0.80)
+pwr.risk
+F_to_eta2(F.risk,numdf.risk,dendf.risk)
+
+n = ceiling(pwr.risk$v+numdf.risk+1)
+n
+```
+###Gain
+```{r calculate sample gain sex, echo=F}
+pwr.gain <- pwr.f2.test(u = numdf.gain, 
+                        v = NULL, 
+                        f2 = f2.gain, 
+                        sig.level = 0.05, 
+                        power = 0.80)
+
+pwr.gain
+
+F_to_eta2(F.gain, numdf.gain, dendf.gain)
+
+n = ceiling(pwr.gain$v+numdf.gain+1)
+n
+```
+
+##education
+```{r obtain effect size for education, echo =FALSE}
+F.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + education, data = data.multi))$fstatistic[1])
+
+numdf.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + education, data = data.multi))$fstatistic[2])
+
+dendf.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + education, data = data.multi))$fstatistic[3])
+
+f2.risk <- F_to_f(F.risk,numdf.risk,dendf.risk)$Cohens_f_partial
+
+F.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + education, data = data.multi))$fstatistic[1])
+
+numdf.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + education, data = data.multi))$fstatistic[2])
+
+dendf.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + education, data = data.multi))$fstatistic[3])
+
+f2.gain <- F_to_f(F.gain, numdf.gain, dendf.gain)$Cohens_f_partial
+```
+
+###Risk
+```{r calculate sample risk education, echo=F}
+pwr.risk <- pwr.f2.test(u = numdf.risk, 
+                        v = NULL, 
+                        f2 = f2.risk, 
+                        sig.level = 0.05, 
+                        power = 0.80)
+pwr.risk
+F_to_eta2(F.risk,numdf.risk,dendf.risk)
+
+n = ceiling(pwr.risk$v+numdf.risk+1)
+n
+```
+###Gain
+```{r calculate sample gain education, echo=F}
+pwr.gain <- pwr.f2.test(u = numdf.gain, 
+                        v = NULL, 
+                        f2 = f2.gain, 
+                        sig.level = 0.05, 
+                        power = 0.80)
+
+pwr.gain
+
+F_to_eta2(F.gain, numdf.gain, dendf.gain)
+
+n = ceiling(pwr.gain$v+numdf.gain+1)
+n
+```
+
+##Income
+```{r obtain effect size for Income, echo =FALSE}
+F.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + Income, data = data.multi))$fstatistic[1])
+
+numdf.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + Income, data = data.multi))$fstatistic[2])
+
+dendf.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + Income, data = data.multi))$fstatistic[3])
+
+f2.risk <- F_to_f(F.risk,numdf.risk,dendf.risk)$Cohens_f_partial
+
+F.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + Income, data = data.multi))$fstatistic[1])
+
+numdf.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + Income, data = data.multi))$fstatistic[2])
+
+dendf.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + Income, data = data.multi))$fstatistic[3])
+
+f2.gain <- F_to_f(F.gain, numdf.gain, dendf.gain)$Cohens_f_partial
+```
+
+###Risk
+```{r calculate sample risk Income, echo=F}
+pwr.risk <- pwr.f2.test(u = numdf.risk, 
+                        v = NULL, 
+                        f2 = f2.risk, 
+                        sig.level = 0.05, 
+                        power = 0.80)
+pwr.risk
+F_to_eta2(F.risk,numdf.risk,dendf.risk)
+
+n = ceiling(pwr.risk$v+numdf.risk+1)
+n
+```
+###Gain
+```{r calculate sample gain Income, echo=F}
+pwr.gain <- pwr.f2.test(u = numdf.gain, 
+                        v = NULL, 
+                        f2 = f2.gain, 
+                        sig.level = 0.05, 
+                        power = 0.80)
+
+pwr.gain
+
+F_to_eta2(F.gain, numdf.gain, dendf.gain)
+
+n = ceiling(pwr.gain$v+numdf.gain+1)
+n
+```
+
+##conservatismFactor
+```{r obtain effect size for conservatismFactor, echo =FALSE}
+F.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + conservatismFactor, data = data.multi))$fstatistic[1])
+
+numdf.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + conservatismFactor, data = data.multi))$fstatistic[2])
+
+dendf.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + conservatismFactor, data = data.multi))$fstatistic[3])
+
+f2.risk <- F_to_f(F.risk,numdf.risk,dendf.risk)$Cohens_f_partial
+
+F.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + conservatismFactor, data = data.multi))$fstatistic[1])
+
+numdf.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + conservatismFactor, data = data.multi))$fstatistic[2])
+
+dendf.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + conservatismFactor, data = data.multi))$fstatistic[3])
+
+f2.gain <- F_to_f(F.gain, numdf.gain, dendf.gain)$Cohens_f_partial
+```
+
+###Risk
+```{r calculate sample risk conservatismFactor, echo=F}
+pwr.risk <- pwr.f2.test(u = numdf.risk, 
+                        v = NULL, 
+                        f2 = f2.risk, 
+                        sig.level = 0.05, 
+                        power = 0.80)
+pwr.risk
+F_to_eta2(F.risk,numdf.risk,dendf.risk)
+
+n = ceiling(pwr.risk$v+numdf.risk+1)
+n
+```
+###Gain
+```{r calculate sample gain conservatismFactor, echo=F}
+pwr.gain <- pwr.f2.test(u = numdf.gain, 
+                        v = NULL, 
+                        f2 = f2.gain, 
+                        sig.level = 0.05, 
+                        power = 0.80)
+
+pwr.gain
+
+F_to_eta2(F.gain, numdf.gain, dendf.gain)
+
+n = ceiling(pwr.gain$v+numdf.gain+1)
+n
+```
+
+##ReligiousFactor
+```{r obtain effect size for ReligiousFactor, echo =FALSE}
+F.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + ReligiousFactor, data = data.multi))$fstatistic[1])
+
+numdf.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + ReligiousFactor, data = data.multi))$fstatistic[2])
+
+dendf.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + ReligiousFactor, data = data.multi))$fstatistic[3])
+
+f2.risk <- F_to_f(F.risk,numdf.risk,dendf.risk)$Cohens_f_partial
+
+F.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + ReligiousFactor, data = data.multi))$fstatistic[1])
+
+numdf.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + ReligiousFactor, data = data.multi))$fstatistic[2])
+
+dendf.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + ReligiousFactor, data = data.multi))$fstatistic[3])
+
+f2.gain <- F_to_f(F.gain, numdf.gain, dendf.gain)$Cohens_f_partial
+```
+
+###Risk
+```{r calculate sample risk ReligiousFactor, echo=F}
+pwr.risk <- pwr.f2.test(u = numdf.risk, 
+                        v = NULL, 
+                        f2 = f2.risk, 
+                        sig.level = 0.05, 
+                        power = 0.80)
+pwr.risk
+F_to_eta2(F.risk,numdf.risk,dendf.risk)
+
+n = ceiling(pwr.risk$v+numdf.risk+1)
+n
+```
+###Gain
+```{r calculate sample gain ReligiousFactor, echo=F}
+pwr.gain <- pwr.f2.test(u = numdf.gain, 
+                        v = NULL, 
+                        f2 = f2.gain, 
+                        sig.level = 0.05, 
+                        power = 0.80)
+
+pwr.gain
+
+F_to_eta2(F.gain, numdf.gain, dendf.gain)
+
+n = ceiling(pwr.gain$v+numdf.gain+1)
+n
+```
+
+##consequentialism.score
+```{r obtain effect size for consequentialism.score, echo =FALSE}
+F.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + consequentialism.score, data = data.multi))$fstatistic[1])
+
+numdf.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + consequentialism.score, data = data.multi))$fstatistic[2])
+
+dendf.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + consequentialism.score, data = data.multi))$fstatistic[3])
+
+f2.risk <- F_to_f(F.risk,numdf.risk,dendf.risk)$Cohens_f_partial
+
+F.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + consequentialism.score, data = data.multi))$fstatistic[1])
+
+numdf.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + consequentialism.score, data = data.multi))$fstatistic[2])
+
+dendf.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + consequentialism.score, data = data.multi))$fstatistic[3])
+
+f2.gain <- F_to_f(F.gain, numdf.gain, dendf.gain)$Cohens_f_partial
+```
+
+###Risk
+```{r calculate sample risk consequentialism.score, echo=F}
+pwr.risk <- pwr.f2.test(u = numdf.risk, 
+                        v = NULL, 
+                        f2 = f2.risk, 
+                        sig.level = 0.05, 
+                        power = 0.80)
+pwr.risk
+F_to_eta2(F.risk,numdf.risk,dendf.risk)
+
+n = ceiling(pwr.risk$v+numdf.risk+1)
+n
+```
+###Gain
+```{r calculate sample gain consequentialism.score, echo=F}
+pwr.gain <- pwr.f2.test(u = numdf.gain, 
+                        v = NULL, 
+                        f2 = f2.gain, 
+                        sig.level = 0.05, 
+                        power = 0.80)
+
+pwr.gain
+
+F_to_eta2(F.gain, numdf.gain, dendf.gain)
+
+n = ceiling(pwr.gain$v+numdf.gain+1)
+n
+```
+
+##BerlinScore
+```{r obtain effect size for BerlinScore, echo =FALSE}
+F.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + BerlinScore, data = data.multi))$fstatistic[1])
+
+numdf.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + BerlinScore, data = data.multi))$fstatistic[2])
+
+dendf.risk <- as.numeric(summary(lm(marginal.effect.risk ~ No + BerlinScore, data = data.multi))$fstatistic[3])
+
+f2.risk <- F_to_f(F.risk,numdf.risk,dendf.risk)$Cohens_f_partial
+
+F.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + BerlinScore, data = data.multi))$fstatistic[1])
+
+numdf.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + BerlinScore, data = data.multi))$fstatistic[2])
+
+dendf.gain <- as.numeric(summary(lm(marginal.effect.gain ~ No + BerlinScore, data = data.multi))$fstatistic[3])
+
+f2.gain <- F_to_f(F.gain, numdf.gain, dendf.gain)$Cohens_f_partial
+```
+
+###Risk
+```{r calculate sample risk BerlinScore, echo=F}
+pwr.risk <- pwr.f2.test(u = numdf.risk, 
+                        v = NULL, 
+                        f2 = f2.risk, 
+                        sig.level = 0.05, 
+                        power = 0.80)
+pwr.risk
+F_to_eta2(F.risk,numdf.risk,dendf.risk)
+
+n = ceiling(pwr.risk$v+numdf.risk+1)
+n
+```
+###Gain
+```{r calculate sample gain BerlinScore, echo=F}
+pwr.gain <- pwr.f2.test(u = numdf.gain, 
+                        v = NULL, 
+                        f2 = f2.gain, 
+                        sig.level = 0.05, 
+                        power = 0.80)
+
+pwr.gain
+
+F_to_eta2(F.gain, numdf.gain, dendf.gain)
+
+n = ceiling(pwr.gain$v+numdf.gain+1)
+n
+```

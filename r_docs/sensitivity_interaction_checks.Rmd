@@ -1,0 +1,18 @@
+---
+title: "interaction checks"
+author: "Kianté Fernandez"
+date: "12/17/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+w.r.t. your nonlinear (quadratic) models, we need to make a definitive statement about:
+
+If the linear effect of one side (risk OR benefit) is modified by the quadratic of the other side, can we make a directional statement about how the steepness of the risk OR benefit effect modifies the strength of the opposite of effect of risk & gain on choice?
+
+Is the forest plot robust to switching the YN-diff variable with a Pearson's correlation coefficient quantifying the risk/benefit covariance for each subject?
+
+If we look at only the bottom half of risk/benefit covariance subs, do the convexity/concavity of the images change drastically?

@@ -1,0 +1,59 @@
+model {
+    # Mean estimates of the linear regressions for the weights
+    b_gain.mu ~ dnorm(0, 1) # gain
+    b_risk.mu ~ dnorm(0, 1) # risk
+    
+    # precisions for the linear regression estimates
+    b_gain.pr ~ dgamma(1, 0.1)
+    b_risk.pr ~ dgamma(1, 0.1)
+    
+    # mean estimates DDM parameters
+    alpha.mu ~ dunif(0.001, 5) # boundary 
+    theta.mu ~ dunif(0, 10) # non decision times
+
+    # Error terms for nDT
+    alpha.pr ~ dgamma(1, 0.1) 
+    theta.pr ~ dgamma(1, 0.1)
+
+    # error term for the regression function
+    e.sG <- pow(e.m,2) / pow(e.d,2)
+    e.rG <- e.m / pow(e.d,2)
+    e.m ~ dgamma(1,0.2)T(0.001,20)
+    e.d ~ dgamma(1,0.5)T(0.001,20)
+
+    # Bias of the DDM
+    bias.alpha <- bias.mu * bias.kappa
+    bias.beta <- (1 - bias.mu) * bias.kappa
+    bias.mu ~ dbeta(2, 2)T(0.01,0.99)
+    bias.kappa ~ dgamma(1, 0.5)
+
+    for (p in 1:ns) { # subject level
+        b_gain.p[p] ~ dnorm(b_gain.mu, b_gain.pr)
+        b_risk.p[p] ~ dnorm(b_risk.mu, b_risk.pr)
+        alpha.p[p] ~ dnorm(alpha.mu, alpha.pr)
+        theta.p[p] ~ dnorm(theta.mu, theta.pr)
+        e.p.tau[p] ~ dgamma(e.sG, e.rG)T(0.001,20)
+        bias[p] ~ dbeta(bias.alpha, bias.beta)T(0.01,0.99)
+    }
+
+    for (i in 1:N) { # trial level
+        # generate predictions
+        y[i] ~ dwiener(bound[i], tau[i], bet[i], w[i]) 
+        ld_comp[i] <- dlogwiener(y[i], bound[i], tau[i], bet[i], w[i])
+        
+        # generate trial-by-trial boundary
+        bound[i] <- alpha.p[idxP[i]]
+
+        # generate trial-by-trial nDT
+        tau[i] <- theta.p[idxP[i]]
+
+        # generate trial-by-trial Bias
+        bet[i] <- bias[idxP[i]]
+
+        # The actual drift rate
+        w[i] ~ dnorm(li.hat[i], e.p.tau[idxP[i]])
+
+        # The linear regression of the value probabilities and value magnitude
+        li.hat[i] <- b_gain.p[idxP[i]] * gain[i] + b_risk.p[idxP[i]] * risk[i]
+    }
+}

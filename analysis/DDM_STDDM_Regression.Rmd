@@ -1,0 +1,455 @@
+---
+title: "STDDM Regression"
+output: html_notebook
+---
+
+This script will relate the DDM parameters for each subject with their ideological variables.
+
+# Libraries
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(data.table)
+```
+
+```{r}
+base_dir = "C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS"
+behavior_path = paste(base_dir, "/data/Cleaned_Pilot/exclusions.2020.10.21.Rdata", sep="")
+load(behavior_path)
+risk_data = Neuroethics_Judgement
+
+# This will assign a unique index to each different 'subj_idx'
+risk_data$idxP <- as.numeric(as.factor(risk_data$user_id))
+```
+
+# Import Data
+
+```{r}
+load('../data/exclusions.2020.10.21.RData')
+
+# ddm_subj <- read.csv('hddm_outputs/ddm_basic4pm_stats_final.csv', stringsAsFactors = FALSE)
+
+ddm_subj <- read.csv('timeDDM/Chen-2021/Scripts/ModelResults/Neuroethics/20240313STDDMResults.csv', stringsAsFactors = FALSE)
+
+# I will not be using this for now because the number of participants is not the same as the original paper
+
+# clean_data <- read.csv("../data/Cleaned_Pilot/clean_data_longV2.csv", stringsAsFactors = FALSE)
+
+clean_data <- Neuroethics_Judgement
+```
+
+## Clean DDM Data
+
+```{r}
+# Load the necessary library
+library(data.table)
+
+# Assuming ddm_subj is already a data.table. If not, convert it:
+# ddm_subj <- as.data.table(ddm_subj)
+
+# Step 1: Filter out rows ending with ".mu"
+ddm_filtered <- ddm_subj %>% filter(!grepl(".mu", X, perl=TRUE)) 
+
+ddm_filtered <- ddm_filtered %>%
+  separate(X, into = c("XXX", "YY"), sep = "\\.?p?\\[") %>%
+  mutate(YY = sub("\\]", "", YY))
+
+# bias[86]
+
+ddm_filtered <- ddm_filtered %>%
+  mutate(XXX_stat = paste(XXX, rep(c("Mean", "Median", "SD"), each = nrow(ddm_filtered)/length(unique(XXX)))))
+
+# Step 1: Pivot the data to wider format, creating new columns for each combination of XXX and statistics
+ddm_wide <- ddm_filtered %>%
+  pivot_wider(id_cols = YY, 
+              names_from = XXX, 
+              values_from = c(Mean, Median, SD),
+              names_sep = "_")  # Creates column names like b1_Mean, b1_Median, b1_SD, etc.
+
+# Example: concatenating all user_id values for each idxP
+risk_data_concatenated <- risk_data %>%
+  group_by(idxP) %>%
+  summarise(user_id = toString(unique(user_id)))  # This creates a single string with all user_id values separated by commas
+
+ddm_wide$YY = as.numeric(ddm_wide$YY)
+
+# Join the concatenated user_id values to ddm_long
+ddm_combined <- left_join(as.data.frame(ddm_wide), risk_data_concatenated, by = c("YY" = "idxP"))
+
+```
+
+## Extract Demographic Data
+
+```{r}
+clean_data_summary <- clean_data %>%
+  group_by(user_id) %>%
+  summarise(
+    condition = first(condition),
+    sex = first(sex),
+    age = first(age),
+    race_ethnicity = first(race_ethnicity),
+    education = first(education),
+    AttendChurch = first(AttendChurch),
+    Religiosity = first(Religiosity),
+    Spirituality = first(Spirituality),
+    ReligiousActivity = first(ReligiousActivity),
+    meditation = first(meditation),
+    Political_Party = first(Political_Party),
+    republican = first(republican),
+    democrat = first(democrat),
+    HumanMind = first(HumanMind),
+    conservative = first(conservative),
+    liberal = first(liberal),
+    Extraversion = first(Extraversion),
+    Agreeableness = first(Agreeableness),
+    Conscientiousness = first(Conscientiousness),
+    Neuroticism = first(Neuroticism),
+    Openness = first(Openness),
+    Harm = first(Harm),
+    Fairness = first(Fairness),
+    Loyalty = first(Loyalty),
+    Athority = first(Athority),
+    Sancticy = first(Sancticy),
+    PerspectiveTaking = first(PerspectiveTaking),
+    Fantasy = first(Fantasy),
+    EmpathicConcern = first(EmpathicConcern),
+    PersonalDistress = first(PersonalDistress),
+    moral.commitment = first(moral.commitment),
+    consequentalism = first(consequentialism.score),
+    GRIPS = first(GRiPs_Score)
+  )
+
+clean_data_summary$politics = clean_data_summary$republican + clean_data_summary$conservative - clean_data_summary$democrat - clean_data_summary$liberal
+```
+
+## Extract Religiosity Score
+
+```{r}
+library(psych)
+religiousMatrix <- data.matrix(clean_data_summary[,c("Religiosity", "Spirituality", "AttendChurch", "ReligiousActivity")]) - 1
+
+#Kaiser-Meyer-Olkin factor adequacy
+KMO <- psych::KMO(religiousMatrix)
+KMO
+KMO$ImCov
+
+#	Bartlett's Test of Sphericity
+REdaS::bart_spher(religiousMatrix)
+
+scree <- psych::polychoric(religiousMatrix)$rho
+evals <- eigen(scree)$values
+print(scree, cutoff = "0.3")
+scree(scree, factors = F)
+
+#religiousMatrix <- psych::polychoric(religiousMatrix)
+EFA <- fa(religiousMatrix, nfactors = 1, rotate = "oblimin", fm ="ml")
+print(EFA$loadings, cutoff = "0.4")
+#round(EFA$Phi, 3)
+(evals/sum(evals)*100)[1:4]
+EFA$communalities
+
+religiousMatrix.efa <- fa(religiousMatrix, nfactors = 1, rotate = "oblimin", fm ="ml", cor = "poly", scores = "regression")
+print(religiousMatrix.efa)
+fa.diagram(religiousMatrix.efa)
+
+print(religiousMatrix.efa$loadings, cutoff = "0.3")
+clean_data_summary$ReligiousFactor <- religiousMatrix.efa$scores
+# data.religious$ReligiousFactor<- religious.efa$scores
+```
+
+
+## Combine Both Tables
+
+```{r}
+# Join the two dataframes on subj_id and user_id
+final_table <- left_join(clean_data_summary, ddm_combined, by = c("user_id" = "user_id"))
+```
+
+# Summary Statistics
+
+# Regression Analysis
+
+## 'alpha' parameter (boundary)
+
+### Condition
+
+```{r}
+final_table$condition <- relevel(final_table$condition, "Motor Function")
+model = lm(Mean_alpha ~ condition, data=final_table)
+summary(model)
+```
+
+### GRIPS
+
+```{r}
+model = lm(Mean_alpha ~ GRIPS, data=final_table)
+summary(model)
+```
+
+### Consequentialism
+
+```{r}
+model = lm(Mean_alpha ~ consequentalism, data=final_table)
+summary(model)
+```
+
+### Politics
+
+```{r}
+model = lm(Mean_alpha ~ politics, data=final_table)
+summary(model)
+```
+
+### Religion
+
+### Moral Intuitions
+
+```{r}
+model = lm(Mean_alpha ~ Harm, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(Mean_alpha ~ Fairness, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(Mean_alpha ~ Loyalty, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(Mean_alpha ~ Athority, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(Mean_alpha ~ Sancticy, data=final_table)
+summary(model)
+```
+
+## 'bias' parameter (boundary)
+
+### Consequentialism
+
+```{r}
+model = lm(Mean_bias ~ consequentalism, data=final_table)
+summary(model)
+```
+
+### Condition
+
+```{r}
+final_table$condition <- relevel(final_table$condition, "Motor Function")
+model = lm(Mean_bias ~ condition, data=final_table)
+summary(model)
+```
+
+
+### Politics
+
+```{r}
+model = lm(Mean_bias ~ politics, data=final_table)
+summary(model)
+```
+
+### Religion
+
+### Moral Intuitions
+
+```{r}
+model = lm(Mean_alpha ~ Harm, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(Mean_alpha ~ Fairness, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(Mean_alpha ~ Loyalty, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(Mean_alpha ~ Athority, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(Mean_alpha ~ Sancticy, data=final_table)
+summary(model)
+```
+
+
+
+## 'b1' parameter (gain drift rate)
+
+### GRIPS
+
+```{r}
+model = lm(Mean_b1 ~ GRIPS, data=final_table)
+summary(model)
+```
+
+### Politics
+
+```{r}
+model = lm(Mean_b1 ~ politics, data=final_table)
+summary(model)
+```
+
+### Religion
+
+### Moral Intuitions
+
+```{r}
+model = lm(Mean_b1 ~ Harm, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(Mean_b1 ~ Fairness, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(Mean_b1 ~ Loyalty, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(Mean_b1 ~ Athority, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(Mean_b1 ~ Sancticy, data=final_table)
+summary(model)
+```
+
+## 'b2' parameter (risk drift rate)
+
+### GRIPS
+
+```{r}
+model = lm(Mean_b2 ~ GRIPS, data=final_table)
+summary(model)
+```
+
+### Politics
+
+```{r}
+model = lm(Mean_b2 ~ politics, data=final_table)
+summary(model)
+```
+
+### Religion
+
+### Moral Intuitions
+
+```{r}
+model = lm(Mean_b2 ~ Harm, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(Mean_b2 ~ Fairness, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(Mean_b2 ~ Loyalty, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(Mean_b2 ~ Athority, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(Mean_b2 ~ Sancticy, data=final_table)
+summary(model)
+```
+
+## 'time' parameter (risk drift rate)
+
+```{r}
+final_table$condition <- relevel(final_table$condition, "Motor Function")
+model = lm(Mean_time ~ condition, data=final_table)
+summary(model)
+```
+
+### sex
+
+```{r}
+model = lm(Mean_time ~ sex, data=final_table)
+summary(model)
+```
+
+### age
+
+```{r}
+model = lm(Mean_time ~ age, data=final_table)
+summary(model)
+```
+
+### GRIPS
+
+```{r}
+model = lm(Mean_time ~ GRIPS, data=final_table)
+summary(model)
+```
+
+### Consequentialism
+
+```{r}
+model = lm(Mean_time ~ consequentalism, data=final_table)
+summary(model)
+```
+
+### Politics
+
+```{r}
+model = lm(Mean_time ~ politics, data=final_table)
+summary(model)
+```
+
+### Religion
+
+### Moral Intuitions
+
+```{r}
+model = lm(Mean_time ~ Harm + Fairness + Loyalty + Athority + Sancticy, data=final_table)
+summary(model)
+```
+
+
+```{r}
+model = lm(Mean_time ~ Harm, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(Mean_time ~ Fairness, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(Mean_time ~ Loyalty, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(Mean_time ~ Athority, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(Mean_time ~ Sancticy, data=final_table)
+summary(model)
+```

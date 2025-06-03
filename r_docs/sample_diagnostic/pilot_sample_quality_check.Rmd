@@ -1,0 +1,130 @@
+---
+title: "Data Processing and Analysis"
+author: "Kianté A. Fernandez"
+date: "3/23/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+library(tidyselect)
+library(magrittr)
+library(ggplot2)
+library(ggpubr)
+
+files <- list.files(path = "../data/mturk_data_first_50_subjs", pattern = "*.csv", full.names = T)
+pilot <- sapply(files, readr::read_csv, simplify=FALSE) 
+Mpilot = bind_rows(pilot)
+
+N = 75 #Set the min number of trials
+cleanPilot = select_(Mpilot,"user_id","condition","total_trials","risk","gain","no_effect", "experimental_treatment_selected")
+cleanPilot = na.omit(cleanPilot)
+cleanPilot = filter(cleanPilot, total_trials >= N)
+cleanPilot = mutate(cleanPilot, ratio = gain / risk)
+cleanPilot$ratio = round(cleanPilot$ratio,4)
+cleanPilot$condition = factor(cleanPilot$condition)
+Neuroethics_Judgement = cleanPilot
+
+rm(Mpilot, pilot, files, cleanPilot) #Clean up the environment
+source("../r_docs/Multiple_plot_function.R")
+```
+
+Given what we have seen with the distributions to this point in addation to taking a look at the observation counts, I think we have a fair rationale for skewing the sampling. 
+
+Here is a list of all pilot subjects observations for yes and no:
+```{r echo=FALSE}
+
+datalist = list()
+for (i in Neuroethics_Judgement$user_id){
+  x = filter(Neuroethics_Judgement, user_id == i)
+  dat = table(x$experimental_treatment_selected) #Check Class bias
+  datalist[[i]] = dat # add it to your list
+}
+Observation_Counts = do.call(rbind, datalist)
+colnames(Observation_Counts) = c('No', 'Yes')
+View(Observation_Counts)
+rm(i, x,datalist, dat)
+print(Observation_Counts)
+```
+
+To confrim, lets take a look at a single subject.
+
+First take a look at the distribution of Harm and Gain for a single subject. 
+
+```{r echo=FALSE}
+user_id = filter(Neuroethics_Judgement, user_id == "nB8WmX4K")
+sub= filter(Neuroethics_Judgement, user_id == "nB8WmX4K")
+i = "nB8WmX4K"
+ggplot(sub,aes(x = risk , y = gain)) + 
+  geom_point(aes(color = experimental_treatment_selected), size = 2.5, alpha = .7) +
+  ggtitle(paste("75 Trials Pilot Subject: ",toString(i))) +
+  scale_x_continuous("Risk Probabilities", breaks=seq(0,100,5), limits=c(0, 100)) +
+  scale_y_continuous("Gain Probabilities", breaks=seq(0,100,5), limits=c(0, 100)) + 
+  theme(legend.position="none")
+```
+
+Okay, good enought we might say. 
+```{r echo=FALSE}
+print(i)
+table(sub$experimental_treatment_selected)
+```
+
+Yet the subject does not have quite a large amount of yes observations.Lets take a look at some density plots. 
+
+Here the y axis of the density plots are the probability of getting an x value between a range of x values at least that is the commonly how I have seen it defined. These are estimated using a Gaussian kernel via kernal density estimation.
+
+```{r echo=FALSE}
+p1 = ggdensity(sub, 
+          main = paste("subject: ",toString(i)),
+          x = "risk",
+          legend.title = "",
+          add = "mean", rug = TRUE,
+          color = "experimental_treatment_selected", fill ="experimental_treatment_selected", palette = c("#f8766d", "#00bfc4"))
+p3 = ggdensity(sub, 
+          x = "gain",
+          legend.title = "",
+          add = "mean", rug = TRUE,
+          color = "experimental_treatment_selected", fill ="experimental_treatment_selected", palette = c("#f8766d", "#00bfc4"))
+p5 = ggdensity(sub, 
+          x = "no_effect",
+          legend.title = "",
+          add = "mean", rug = TRUE,
+          color = "experimental_treatment_selected", fill ="experimental_treatment_selected", palette = c("#f8766d", "#00bfc4"))
+
+p2=gghistogram(sub, 
+            x = "risk",
+            ylab = "Number of Occurrences",
+            add = "mean", rug = TRUE,
+            fill = "experimental_treatment_selected",  palette = c("#f8766d", "#00bfc4"),
+            add_density = TRUE, bins = 25,
+            legend.title = "")
+p4=gghistogram(sub, 
+            x = "gain",
+            ylab = "Number of Occurrences",
+            add = "mean", rug = TRUE,
+            fill = "experimental_treatment_selected",  palette = c("#f8766d", "#00bfc4"),
+            add_density = TRUE, bins = 25,
+            legend.title = "")
+p6=gghistogram(sub, 
+            x = "no_effect",
+            alpha = .5,
+            ylab = "Number of Occurrences",
+            add = "mean", rug = TRUE,
+            fill = "experimental_treatment_selected",  palette = c("#f8766d", "#00bfc4"),
+            add_density = TRUE, bins = 25,
+            legend.title = "")
+
+multiplot(p1, p2, p3, p4, p5, p6, cols=3)
+```
+
+## A final thoughts 
+
+* Notice how sparce our gain distribution is.
+* Also notice how we have are pulling our risk distribution from the oversample of 40 to 50 percent
+
+I will upload the plots for all the pliot subjects in the dropbox.
+
+Thanks for letting me get some practice in markdown.
+ 

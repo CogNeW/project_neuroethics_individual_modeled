@@ -1,0 +1,248 @@
+---
+title: "h1&h2models for neuroethical judgments"
+author: "Kianté Fernandez"
+date: "5/22/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load library, include=FALSE}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(GGally)
+library(gridExtra)
+library(reshape2)
+library(lmerTest)
+library(lme4)
+library(Hmisc)
+library(psych)
+library(car)
+```
+
+To follow what I did below the code directly below puts the data in the format I used to test for beta differences and condition differences. 
+
+
+I realized that the code i sent is in long format, but you can make it 'longer' in the sense that we take each of the beta's and create an id variable (either risk, gain, or interaction).
+
+
+These two will put the data in the long format with `type` being each beta and `Beta` being the values extracted from the logistic reg.
+
+
+Import data and exclude outliers (i.e, subs with extreme risk or benefit weights relative to the sample (need to find a SD criterion))
+```{r import data}
+#import the csv I sent here and call it data
+data <- read.csv("longFormat.csv", header = TRUE) %>%  filter(user_id != "FIvIqXVg") %>%   filter(user_id != "tTZWd9tg") %>%  filter(user_id != "ZJ8tICU0") %>%   filter(user_id != "4lsMLrPn") %>%  filter(user_id != "0XnbWTTY")
+```
+
+```{r long}
+#long format
+data.h1.long <-distinct(dplyr::select(data,
+               user_id, Risk_Beta, Gain_Beta, Interaction_Beta)) %>% 
+  melt(id = "user_id", variable.name = "type", value.name = "Beta") 
+
+#h2 data long
+data.h2.long <- distinct(dplyr::select(data,
+                user_id ,condition, trial_index,  Risk_Beta , Gain_Beta , Interaction_Beta)) %>% 
+  melt(id = c("user_id","condition", "trial_index"),
+                       variable.name = "type", 
+                       value.name = "Beta")
+```
+
+###MAKE SURE to log-transform the betas (even after outliers) because they are highly skewed- you can call this with log() in the analyses
+
+### Also run a t-test between risk & beta after absolute value of risk (i.e., such that both are positive. This test tells us if the absolute weight is higher in one than the other)
+
+##H1
+This is how I would go about testing our first aim:
+
+###JDM: This is good- the only thing we want to know before these models is whether the risk/benefit effects are significantly greater than 0. So, I would just add a one sample t-test for each of risk, benefit & neutral. If Neutral is not sig. dif. from 0, that's a quantitative reason to drop it. Then, go ahead and test whether risk and benefit are dif. from each other like you do here.
+
+```{r}
+#I take a subset of the data to disclude the interaction betas because we are only testing risk and gain differences
+subset <- subset(data.h1.long, type != "Interaction_Beta")
+
+# Sort by beta type then user_id so that the t test function reads it
+subset <- subset[order(subset$type, subset$user_id), ]
+
+# Paired t-test
+t.test(Beta ~ type, subset, paired=TRUE)
+#said another way...(you can 'never' look at something in too many ways...)
+#t.test(data$Risk_Beta - data$Gain_Beta, mu=0, var.equal=TRUE)
+
+
+#Here we are including the interaction beta in the model and testing again while accounting for type being within users
+aov <- aov(Beta ~ type + Error(user_id/type), data=data.h1.long)
+summary(aov)
+model.tables(aov, "means")
+
+#a graph with mean too! 
+ggplot(data.h1.long, aes(x=type, y=Beta, fill=type)) + geom_boxplot()+
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", color = "red") + 
+    stat_summary(fun = mean, geom = "point", color = "red")
+```
+So the thing about this is I actully see larger effects for gain than risk here. 
+
+Now I did meantion we have alot of people leveraging the data so I'd check my assumption. I could have also built the logistic models wrong. So I included the code for how I made those below as well (it is in the chunk titled "within subject logistic"). 
+
+##H2 
+Participants risk aversion to harm will change as the cognitive domain being treated changes. Specifically, participants will be more risk averse to mood, and self-control because these are more central to self-identity & physical autonomy/ability (e.g., motor).
+
+Why would we expect that the difference in weights between harm/benefit would be moderated by cognitive domain? 
+-Goodwin & Sun: Willingness to alter traits varies. (How did they frame it, and what were the domains?)
+  -Enhancing, not repairing
+  -Subjects rated themselves on traits. Asked others to rate the importance of those   traits in characterizing that person. 
+  -People thought the more important things to change were less morally relevant.
+  -I.e., reifies the idea that people don't influence "core" characterological         traits.
+  
+First, we want to split this such that we have a condition model for Risk, and a second model for Benefit. We might even just use a one-way ANOVA, then do post hoc t-tests.
+
+One way to represent the whole data transparently is to include a table (one each for risk and benefit) with all Cognitive domains by all cognitive domans, whose elements contain the t-statistics and associated p-values for each domain.
+
+
+```{r lm test}
+
+lm.null <- lm(Beta ~ 1, data=data.h2.long)
+lm.0 <- lm(Beta ~ type, data=data.h2.long)
+
+lm.1 <- lm(Beta ~ type + condition, data=data.h2.long)
+
+lm.2 <- lm(Beta ~ type*condition, data=data.h2.long) 
+
+anova(lm.null, lm.0, lm.1, lm.2)
+summary(lm.2)
+
+
+#Below gives you all the pariwise comparisions if you're into that (adjusted of course)
+#library(multcomp)
+#library(lsmeans)
+#summary(glht(lm.2, lsm(pairwise ~ type + condition)), test=adjusted(type="holm"))
+```
+
+Q: is their an interaction between condition and beta type on beta weight?
+```{r Anova}
+#run a Mixed design ANOVA
+aov <- aov(Beta ~ condition*type + Error(user_id/type), data=data.h2.long)
+summary(aov)
+```
+
+
+
+
+
+
+We can take a multilevel model apporach by consider that trials happen over time and consider our between subject condition variable as a random effect term to which we vary by intercept and trial. Since we begin seeing boundary issues in our base model, we chose not to model trial as a random slope; this makes sense because we would not expect much variance across trials between conditions. 
+
+Further I am not sure after demonstrating trial does not have an effect that we would even include it within our model! 
+```{r multilevel model at the level of the group, fig.height=7, fig.width=12, dpi=300}
+#this is a base model with only trial information
+m.base <- lmer(Beta ~ trial_index +
+                      (1 |type:condition) + (1 | user_id), 
+                      data = data.h2.long,REML=F)
+#add beta term
+m.0 <- lmer(Beta ~ trial_index + type +
+                      (1 |type:condition) + (1 | user_id), 
+                      data = data.h2.long,REML=F)
+#add cog domain
+m.1 <- lmer(Beta ~ trial_index + type + condition +
+                      (1 |type:condition) + (1 | user_id), 
+                      data = data.h2.long,REML=F)
+#add interaction
+m.2 <- lmer(Beta ~ trial_index + type + condition + type:condition +
+                      (1 |type:condition) + (1 | user_id), 
+                      data = data.h2.long,REML=F, 
+                      control=lmerControl(optimizer="Nelder_Mead"))
+
+anova(m.base, m.0, m.1, m.2)
+
+
+# check homogeneity because it looks like a single cognitive domain is driving the condition effect 
+#Computes Levene's test for homogeneity of variance across groups.
+leveneTest(data.h2.long$Beta, data.h2.long$condition, center = mean)
+
+
+
+ # generate diagnostic plots 
+
+
+plot(m.2, condition ~ resid(.), abline = 0 )
+
+plot(m.2, resid(., type = "pearson") ~ fitted(.) | condition, id = 0.05, 
+     adj = -0.3, pch = 20, col = "gray40")
+plot(m.2, form = resid(., type = "pearson") ~ fitted(.) | condition, abline = 0, 
+     cex = .5, pch = 20, col = "black")
+
+# observed responses versus the within-group fitted values
+plot(m.2, Beta ~ fitted(.), id = 0.05, adj = -0.3, cex = .8, pch = 20, col = "blue")
+```
+
+
+We could not include the trial index and it could look like this 
+```{r}
+m.base <- lmer(Beta ~ type +
+                        (1 |user_id), 
+                      data = data.h2.long,REML=F)
+#add cog domain
+m.1 <- lmer(Beta ~   type + condition +
+                        (1 |user_id), 
+                      data = data.h2.long,REML=F)
+#adding interactions
+m.2 <- lmer(Beta ~  type*condition  +
+                       (1 |user_id), 
+                      data = data.h2.long,REML=F,
+                      control=lmerControl(optimizer="Nelder_Mead"))
+
+anova(m.base, m.1, m.2)
+summary(m.2)
+``` 
+
+
+Here is what it would look like if i did not create models for each subject and instead started with a mix model
+```{r logisitc mixed models}
+data$risk.z <- scale(data$risk)
+data$gain.z <- scale(data$gain)
+
+m.0 <- glmer(experimental_treatment_selected ~  risk.z + gain.z +
+                   (1 | user_id), 
+                   data = data, family = binomial, 
+                   control=glmerControl(optimizer="Nelder_Mead"))
+
+m.1 <- glmer(experimental_treatment_selected ~   risk.z + gain.z + condition +
+                   (1  | user_id), 
+                   data = data, family = binomial, 
+                   control=glmerControl(optimizer="Nelder_Mead"))
+
+m.2 <- glmer(experimental_treatment_selected ~  risk.z*gain.z + condition +
+                   (1 | user_id), 
+                   data = data, family = binomial, 
+                   control=glmerControl(optimizer="Nelder_Mead"))
+
+m.3 <- glmer(experimental_treatment_selected ~  risk.z*gain.z + risk.z*condition +
+                   (1 | user_id), 
+                   data = data, family = binomial, 
+                   control=glmerControl(optimizer="bobyqa"))
+
+#this is notation for all the two way interactions between 
+m.4 <- glmer(experimental_treatment_selected ~ (risk.z + gain.z + condition)^2 +
+                   (1 | user_id), 
+                   data = data, family = binomial, 
+                   control=glmerControl(optimizer="bobyqa"))
+
+anova(m.0, m.1, m.2, m.3, m.4)
+```
+
+
+
+
+```{r within subject logistic}
+#this standardizes the scores
+data <- group_by(data, user_id) %>% 
+   mutate(risk_z= scale(risk)) %>% 
+   mutate(gain_z= scale(gain))
+
+#this runs a logisic model for the data grouped by user id using the scaled IV as created above
+m.logistic = by(data, data$user_id, function(x) glm(experimental_treatment_selected ~ risk_z*gain_z, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+```

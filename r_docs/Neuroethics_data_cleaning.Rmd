@@ -1,0 +1,1363 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Kiante Fernandez
+
+#Main Hypotheses
+
+1) Consistent with previous research on behavioral economics and moral decision making, we hypothesize that participants will be more psychologically risk averse to harm than gain motivated.
+
+2) Participants risk aversion to harm will change as the cognitive domain being treated changes. Specifically, participants will be more risk averse to mood, and self-control because these are more central to self-identity.
+
+3) Participants who are more affluent, educated, liberal, and younger will be risk seeking relative to the average risky decision making behavior observed when judging treatments for others.
+
+
+##Set the stage
+```{r load libraries }
+library(tidyverse)
+library(psych)
+library(car)
+library(mfx)
+```
+
+```{r Import and Transform task data, message=FALSE, warning=FALSE, include=FALSE}
+# Disable scientific notation
+options(scipen=999)
+
+#note to pull data in terminal: aws s3 sync s3://neuroethics-task .
+files <- list.files(path = "../data/mturk_data/mturk_data_05202020", pattern = "*.csv", full.names = T)
+
+#combine all the task csv into a list
+
+pilot <- sapply(files, readr::read_csv, simplify=FALSE) 
+raw.data = bind_rows(pilot)
+
+#get needed variables from from pulled csv for each subject
+raw.data %>% 
+ dplyr::select(user_id, condition, total_trials, risk, gain ,no_effect, experimental_treatment_selected, key_press, rt) %>% 
+  na.omit() %>% 
+  filter(total_trials >= 75) %>% 
+  mutate(ratio = gain / risk) -> clean.data #Gain over Risk
+
+clean.data$condition = factor(clean.data$condition) 
+clean.data$experimental_treatment_selected = as.integer(clean.data$experimental_treatment_selected)
+
+clean.data$experimental_treatment_selected = factor(clean.data$experimental_treatment_selected, labels = c("No to treatment","Yes to treatment"))
+```
+
+#Data Exclusions
+
+```{r survey data merge}
+survey = read.csv("../data/Qualtrics Data/May_20_2020.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE) %>% 
+  filter(batch >= 3) 
+#clean.data = merge(clean.data, survey, "user_id")
+#581
+```
+
+```{r remove specific pilot users, eval=FALSE}
+#this removes the subjects task data that we collected on an accidently deployment 
+REMOVE = c(
+  "wpchz8fz",
+  "tdDTyNLl",
+  "CUyB01Th",
+  "d9UbV0sj",
+  "PiGCo5DO",
+  "yCZDIVJF",
+  "WUTFOue2",
+  "Rp8H93tM",
+  "9Z5vJ7oT",
+  "esSkjqdS",
+  "XNHqndg3",
+  "spGR9XvT",
+  "qf27dbHj",
+  "y6m1AOsD",
+  "hgbHHiLn",
+  "Ly8mJkxP"
+)
+for (i in REMOVE){
+clean.data <- clean.data %>% 
+  filter(!str_detect(user_id, i))
+}
+```
+
+```{r careless/insufficient effort responce check}
+#Remove Duplicates
+Double.REMOVE = read.csv("../data/Redundancies.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE)
+
+for (i in Double.REMOVE$Completion_Code){
+  survey <- survey %>% 
+    filter(!str_detect(ResponseId, i))
+}
+```
+
+```{r Attention checks}
+survey %>% 
+  filter(attention_check.1 == 1) %>% 
+  filter(attention_check.2 == 1) %>% 
+  filter(attention_check.3 == 1) %>% 
+  filter(attention_check.4 == 1) -> survey
+#509
+```
+
+```{r Time to complete survey}
+time2completion <- cbind(survey$Duration..in.seconds./60, survey[18])
+
+survey = survey[,-c(1:17)]
+survey <- merge(survey, time2completion, "user_id")
+colnames(survey)[199] <- "time2completion"
+colnames(time2completion) <- c("time2completion","user_id")
+
+
+
+ggplot(time2completion, aes(time2completion))+ 
+  geom_density(fill = "deepskyblue", 
+               bw = 1)+
+  scale_x_continuous("Time in Mins",
+                            breaks=seq(0,125,5), limits=c(0, 125))+
+  theme_bw()
+ggplot(time2completion, aes(time2completion))+ 
+  geom_histogram(fill = "deepskyblue",
+                 color="black",
+                 bins = 50)+
+  scale_x_continuous("Time in Mins",
+                            breaks=seq(0,125,5), limits=c(0, 125))+
+  theme_bw()
+
+survey <- filter(survey, time2completion >= 5) 
+
+clean.data = merge(clean.data, cbind(survey[1], survey[199]), "user_id")
+```
+
+```{r how much time did the task take? }
+raw.data %>% 
+ filter(trial_index == 229) %>% 
+ dplyr::select(user_id, time_elapsed) %>% 
+  mutate(task_completed = time_elapsed/60000) %>% 
+  dplyr::select(user_id, task_completed) -> task.time
+
+
+clean.data <- merge(clean.data, task.time, "user_id")
+
+task.time %>% 
+  dplyr::select(user_id, task_completed) %>% 
+  distinct() %>% 
+  summarize(n = n(),
+         mean = mean(task_completed),
+         median =median(task_completed),
+         sd = sd(task_completed),
+         se = sd / sqrt(n),
+         ci = qt(0.975, df = n - 1) * sd / sqrt(n)) 
+
+ggplot(task.time, aes(task_completed))+ 
+  geom_density(fill = "deepskyblue", 
+               bw = 1)+
+  scale_x_continuous("Time in Mins",
+                            breaks=seq(0,90,5), limits=c(0, 90))+
+  theme_bw()
+
+ggplot(task.time, aes(task_completed))+ 
+  geom_histogram(fill = "deepskyblue",
+                 color="black",
+                 bins = 90)+
+  scale_x_continuous("Time in Mins",
+                            breaks=seq(0,95,2), limits=c(0, 95))+
+  theme_bw()
+
+clean.data <- filter(clean.data, task_completed >= 2) 
+```
+
+
+```{r RT data,}
+#Check the RT data for outliers
+n=nrow(clean.data)/75
+trial_index = data_frame(rep.int(c(1:75), n)) 
+colnames(trial_index)= c("trial_index")
+
+clean.data = cbind(clean.data,trial_index)
+clean.data$trial_index = factor(clean.data$trial_index)
+#4000 & 10000
+clean.data = filter(clean.data, rt <= 90000 & rt >= 250)
+clean.data =subset(clean.data, with(clean.data, user_id %in% names(which(table(user_id)>=40)))) #Remove Subjects who do not have 75 trials
+#508
+```
+
+
+```{r corr, eval=FALSE, include=FALSE}
+clean.data %>% 
+  dplyr::select(user_id, risk, gain) %>% 
+  group_by(user_id) %>% 
+  correlation::correlation() -> corrs
+
+ corrs[,c("Group", "r")] -> index
+ 
+ index %>% 
+   filter(!r <= quantile(index$r, .75))-> data.subset
+ #index -> data.subset
+ colnames(data.subset) <- c("user_id", "r")
+
+ 
+clean.data <- merge(data.subset,clean.data, "user_id")
+```
+
+
+```{r get betas for within subject models}
+clean.data %>% 
+  dplyr::select(user_id,risk,gain,ratio, rt, experimental_treatment_selected) %>% 
+  group_by(user_id) %>% 
+  #mutate(risk = -risk) %>% 
+  mutate(risk.c = scale(risk, scale = F)) %>% 
+  mutate(gain.c = scale(gain, scale = F)) %>% 
+  mutate(treatment = ifelse(experimental_treatment_selected == "Yes to treatment", 1, 0)) -> logit.data 
+
+m.logit <- by(logit.data, logit.data$user_id, function(x) glm(treatment ~ 1  + risk.c + gain.c, data = x, family = binomial(link = "logit"),control=glm.control(maxit=50)))
+
+#Compute beta
+user_id <- names(m.logit)
+n = nrow(logit.data)/75
+n=456
+betas <- list()
+colin <- list()
+
+for (i in 1:n){
+dat = m.logit[[i]]$coefficients
+  betas[[i]] = dat
+}
+
+subjectModels <- do.call(rbind, betas)
+colnames(subjectModels) <-  c('Intercept', 'Risk_Beta', 'Gain_Beta') #interaction removed
+subjectModels <- cbind.data.frame(user_id, subjectModels)
+
+#check the variance inflation factors 
+for (i in user_id){
+vif <- car::vif(m.logit[[i]])
+colin[[i]] <- vif
+}
+
+subjectcolin <- as.data.frame(do.call(rbind, colin))
+subjectcolin <- tibble::rownames_to_column(subjectcolin, "user_id")
+colnames(subjectcolin) <-  c("user_id","vif.risk", "vif.gain")
+
+#loop the r^2 calculator on the fitted final model
+subject.r2 = list() 
+
+for (i in 1:n){
+  LogModel <- m.logit[[i]]
+  dev <- LogModel$deviance 
+  nullDev <- LogModel$null.deviance 
+  modelN <-  length(LogModel$fitted.values)
+  R.cs <- 1- exp ( -(nullDev - dev) / modelN)
+  dat <- R.cs / ( 1 - ( exp (-(nullDev / modelN))))
+  subject.r2[[i]] = dat
+}
+
+
+subjectModels.r2 <- do.call(rbind, subject.r2)
+colnames(subjectModels.r2) <-  c("Nagelkerke_R2")
+
+subjectModels.r2 <- cbind.data.frame(user_id, subjectModels.r2)
+ 
+subjectModels.r2 %>%    
+   filter(!Nagelkerke_R2 == -Inf) %>% 
+   filter(!Nagelkerke_R2 <= quantile(subjectModels.r2$Nagelkerke_R2, .05)) -> index
+
+
+clean.data <-  merge(clean.data, index, "user_id")
+
+#remove subject if they have vif for risk or gain above 4 
+subjectcolin %>% 
+  filter(!vif.risk > 5) %>% 
+  filter(!vif.gain > 5) -> index 
+
+#merge the subject models extracted above and the index
+subjectModels <- merge(subjectModels, index, "user_id")
+
+clean.data <-  merge(clean.data, subjectModels, "user_id")
+
+#calculate average marginal effects
+m.marginal <-  by(logit.data, logit.data$user_id, function(x) logitmfx(treatment ~ risk.c + gain.c, control=glm.control(maxit=50), data = x))
+
+user_id <- names(m.marginal)
+marginal.effect <- list()
+n = 456
+for (i in 1:n){
+dat = m.marginal[[i]]$mfxest[c(1,2,7,8)]
+  marginal.effect[[i]] = dat
+}
+subjectModels.marginal <- do.call(rbind, marginal.effect)
+colnames(subjectModels.marginal) <-  c("marginal.effect.risk", "marginal.effect.gain", "marginal.effect.P.risk","marginal.effect.P.gain")
+
+subjectModels.marginal <- cbind.data.frame(user_id, subjectModels.marginal)  
+
+clean.data <-  merge(clean.data, subjectModels.marginal, "user_id")
+```
+
+```{r}
+datalist.dignostics = list()
+for (i in user_id){
+  subjectDignostics = filter(logit.data, user_id == i)
+      subjectDignostics$predicted.probabilities<-m.logit[[i]]$fitted
+  datalist.dignostics[[i]] = subjectDignostics
+}
+datalist.dignostics = do.call(rbind, datalist.dignostics)
+
+datalist.dignostics$user_id <- factor(datalist.dignostics$user_id)
+
+datalist.dignostics %>% 
+ dplyr::select(user_id,ratio, predicted.probabilities) %>% 
+  #group_by(user_id) %>% 
+  summarize(n = n(),
+         mean = mean(predicted.probabilities),
+         avg_reject = (1 - mean)*100,
+         sd = sd(predicted.probabilities)) %>% na.omit()
+
+datalist.dignostics %>% 
+ dplyr::select(user_id,ratio, predicted.probabilities) %>% 
+  #filter(predicted.probabilities > .5000000000)%>% 
+  group_by(user_id) %>% 
+  summarise(n = n(),
+         mean = mean(ratio),
+         min = min(ratio)) %>% na.omit() -> plots
+
+mean(plots$mean)
+psych::describe(plots$mean)
+
+ggplot(datalist.dignostics, aes(ratio, predicted.probabilities)) + 
+  scale_color_brewer(palette="Set2") +
+  stat_summary(fun.data = mean_se, geom = "pointrange", size= .45, alpha = 0.50, color = "blue")+
+  geom_hline(yintercept = 0.5,  color = "red", linetype="dashed")+
+  theme_bw(base_size = 7)+
+  scale_y_continuous("P(Treatment)", breaks=seq(0,1,.25), limits=c(0, 1))+
+  scale_x_continuous("Gain/Risk", breaks=seq(0,20,5), limits=c(0, 20))+
+  geom_vline(aes(xintercept=mean(plots$mean)), color = "red",linetype="dashed")+ 
+  annotate("text", x =4 , y = .25,
+  label = "paste(Gain/Risk, \" = 1.83\")", parse = TRUE,color = "red")
+```
+
+
+```{r Pseduo R^2s, eval=FALSE, include=FALSE}
+#loop the r^2 calculator on the fitted final model
+subject.r2 = list() 
+
+for (i in 1:n){
+  LogModel <- m.logit[[i]]
+  dev <- LogModel$deviance 
+  nullDev <- LogModel$null.deviance 
+  modelN <-  length(LogModel$fitted.values)
+  R.cs <- 1- exp ( -(nullDev - dev) / modelN)
+  dat <- R.cs / ( 1 - ( exp (-(nullDev / modelN))))
+  subject.r2[[i]] = dat
+}
+
+
+subjectModels.r2 <- do.call(rbind, subject.r2)
+colnames(subjectModels.r2) <-  c("Nagelkerke_R2")
+
+subjectModels.r2 <- cbind.data.frame(user_id, subjectModels.r2)
+ 
+subjectModels.r2 %>% 
+   filter(!Nagelkerke_R2 == -Inf) %>% 
+   filter(!Nagelkerke_R2 <= quantile(subjectModels.r2$Nagelkerke_R2, .05)) -> index
+
+
+clean.data <-  merge(clean.data, index, "user_id")
+```
+
+```{r p values, eval=FALSE, include=FALSE}
+datalist.pvalue = list()
+for (i in user_id){
+dat = coef(summary(m.logit[[i]]))[,4]#This is coef pvalues
+  datalist.pvalue[[i]] = dat
+}
+subjectModel.Pvalue <-bind_rows(datalist.pvalue)
+
+colnames(subjectModel.Pvalue) <-  c('Intercept_sig','Risk_sig', 'Gain_sig')#removed interaction
+
+for (ii in 1:3){
+  for(jj in 1:n){
+    if (subjectModel.Pvalue[jj,ii] > 0.05)
+    subjectModel.Pvalue[jj,ii] <- 0
+    else 
+      subjectModel.Pvalue[jj,ii] <- 1
+  }
+}
+subjectModel.Pvalue <- cbind.data.frame(user_id, subjectModel.Pvalue)
+subjectModel.Pvalue$Risk_sig <-  factor(subjectModel.Pvalue$Risk_sig, levels = c(0,1), labels = c("Not Significant","Significant"))
+subjectModel.Pvalue$Gain_sig <-  factor(subjectModel.Pvalue$Gain_sig, levels = c(0,1), labels = c("Not Significant","Significant"))
+#subjectModel.Pvalue$Interaction_sig <-  factor(subjectModel.Pvalue$Interaction_sig, levels = c(0,1), labels = c("Not Significant","Significant"))
+
+subjectModels <- cbind.data.frame(subjectModels, subjectModel.Pvalue[,c("Risk_sig", "Gain_sig")])
+```
+
+```{r observation counts}
+#How many observatoins does each subject have in each class (yes and no)?
+datalist = list()
+for (i in clean.data$user_id){
+  x = filter(clean.data, user_id == i)
+  dat = table(x$experimental_treatment_selected) #Check Class bias
+  datalist[[i]] = dat # add it to your list
+}
+Observation_Counts = do.call(rbind, datalist)
+colnames(Observation_Counts) = c('No', 'Yes')
+#summary(Observation_Counts)
+rm(i, x,datalist, dat)
+
+x <- distinct(clean.data, user_id)
+
+Observation_Counts <- cbind(Observation_Counts, x)
+clean.data <-  merge(clean.data, Observation_Counts, "user_id")
+```
+
+```{r self report data quality check, eval=FALSE, include=FALSE}
+Self.Report <- cbind(survey[,"user_id"], survey[,189:195])
+
+colnames(Self.Report) <- c('user_id',
+                           'accurate',
+                           'without.reading',
+                           'rushed', 
+                           'include.data',
+                           'randomly',
+                           'effort',
+                           'careful.thought')
+
+Remove.1 <- Self.Report %>% #Remove by self reported randomness apprasial
+  filter(randomly >=5)
+
+Remove.2 <- Self.Report %>%  #Remove by self reported subjective data quality 
+  filter(!randomly >=5) %>%
+  filter(include.data <=3)
+
+Remove.3 <- Self.Report %>%  #Remove by self reported rushing
+  filter(!randomly >=5) %>%
+  filter(!include.data <=3) %>%
+  filter(rushed >=5)
+
+Remove <- rbind(Remove.1,Remove.2,Remove.3)
+
+for (i in Remove$user_id){
+survey <- survey %>% 
+  filter(!str_detect(user_id, i))
+}
+
+rm(Remove.1,Remove.2,Remove.3)
+
+clean.data <- merge(clean.data, survey[1], "user_id")
+```
+
+#Measure scoring and cleaning
+
+```{r Personlity Big 5}
+Big5 <- c("BIG5_1", "BIG5_6", "BIG5_11", "BIG5_16","BIG5_21", "BIG5_26", "BIG5_31", "BIG5_36", "BIG5_41", "BIG5_46", "BIG5_51", "BIG5_56", "BIG5_2", "BIG5_7", "BIG5_12", "BIG5_17", 
+                                        "BIG5_22", "BIG5_27", "BIG5_32", "BIG5_37", 
+                                        "BIG5_42", "BIG5_47", "BIG5_52", "BIG5_57",
+          "BIG5_3", "BIG5_8", "BIG5_13", "BIG5_18",
+                                        "BIG5_23", "BIG5_28", "BIG5_33", "BIG5_38", 
+                                        "BIG5_43", "BIG5_48", "BIG5_53", "BIG5_58",
+          "BIG5_4", "BIG5_9", "BIG5_14", "BIG5_19", 
+                                        "BIG5_24", "BIG5_29", "BIG5_34", "BIG5_39", 
+                                        "BIG5_44", "BIG5_49", "BIG5_54", "BIG5_59",
+          "BIG5_5", "BIG5_10", "BIG5_15", "BIG5_20", 
+                                        "BIG5_25", "BIG5_30", "BIG5_35", "BIG5_40", 
+                                        "BIG5_45", "BIG5_50", "BIG5_55", "BIG5_60"
+          )
+B5 <- survey[,Big5]
+
+Big5key <- list(   Extraversion      =c("BIG5_1", "BIG5_6", "BIG5_11", "BIG5_16", 
+                                        "BIG5_21", "BIG5_26", "BIG5_31", "BIG5_36", 
+                                        "BIG5_41", "BIG5_46", "BIG5_51", "BIG5_56"),
+                   Agreeableness     =c("BIG5_2", "BIG5_7", "BIG5_12", "BIG5_17", 
+                                        "BIG5_22", "BIG5_27", "BIG5_32", "BIG5_37", 
+                                        "BIG5_42", "BIG5_47", "BIG5_52", "BIG5_57"),
+                   Conscientiousness =c("BIG5_3", "BIG5_8", "BIG5_13", "BIG5_18",
+                                        "BIG5_23", "BIG5_28", "BIG5_33", "BIG5_38", 
+                                        "BIG5_43", "BIG5_48", "BIG5_53", "BIG5_58"),
+                   Neuroticism       =c("BIG5_4", "BIG5_9", "BIG5_14", "BIG5_19", 
+                                        "BIG5_24", "BIG5_29", "BIG5_34", "BIG5_39", 
+                                        "BIG5_44", "BIG5_49", "BIG5_54", "BIG5_59"),
+                   Openness          =c("BIG5_5", "BIG5_10", "BIG5_15", "BIG5_20", 
+                                        "BIG5_25", "BIG5_30", "BIG5_35", "BIG5_40", 
+                                        "BIG5_45", "BIG5_50", "BIG5_55", "BIG5_60"))
+
+#names(Big5key) <-  c("Extraversion","Agreeableness","Conscientiousness","Neuroticism","Openness")
+scores <- scoreItems(Big5key,B5)
+
+clean.data <- merge(clean.data, cbind(scores$scores, survey[1]), "user_id")
+#note we get NaNs produced here. Not sure why, could be due to the careless subjects
+
+#test <- careless::longstring(B5,avg = T)
+#test <- careless::irv(B5, split = T, num.split = 5)
+#boxplot(test$irv5) #produce a boxplot of the IRV for the fourth quarter
+
+#psychsyn_cor <- careless::psychsyn_critval(B5)
+#sum(psychsyn_cor$Freq > .58, na.rm = TRUE)
+
+#example_psychsyn <- careless::psychsyn(B5, critval = .58, diag = T)
+#hist(example_psychsyn, main = "Histogram of psychometrical synonyms index")
+```
+
+```{r Moral Foundations Survey}
+MFQ <- cbind(survey[,4:36], survey[1])
+MFQ <- MFQ[,-17]#take out attention check
+
+MFQkey <- list(     Harm     <- c("MFSQ1","MFSQ7","MFSQ12","MFSQ17","MFSQ23","MFSQ28"),
+                    Fairness <- c("MFSQ2","MFSQ8","MFSQ13","MFSQ18","MFSQ24","MFSQ29"),
+                    Loyalty  <- c("MFSQ3","MFSQ9","MFSQ14","MFSQ19","MFSQ25","MFSQ30"),
+                    Athority <- c("MFSQ4","MFSQ10","MFSQ15","MFSQ20","MFSQ26","MFSQ31"),
+                    Sancticy <- c("MFSQ5","MFSQ11","MFSQ16","MFSQ21","MFSQ27","MFSQ32"))
+names(MFQkey) <-  c("Harm","Fairness","Loyalty","Athority","Sancticy")
+
+MFQsc <- scoreItems(MFQkey,MFQ)
+dat<- cbind(MFQsc$scores, survey[1])
+clean.data <- merge(clean.data, dat, "user_id")
+```
+
+```{r Empathy-IRI; Interpersonal Reactivity Index}
+IRI <- cbind(survey[,139:167], survey[1])
+IRI <- IRI[,-24]#take out attention check
+
+IRIkey <- list(PerspectiveTaking <- c("PT1","PT2","PT3","PT4","PT5","PT6","PT7"),
+               Fantasy           <- c("FS1","FS2","FS3","FS4","FS5","FS6","FS7"),
+               EmpathicConcern   <- c("EC1","EC2","EC3","EC4","EC5","EC6","EC7"),
+               PersonalDistress  <- c("PD1","PD2","PD3","PD4","PD5","PD6","PD7"))
+names(IRIkey) <- c("PerspectiveTaking","Fantasy","EmpathicConcern","PersonalDistress")
+
+IRIsc <- scoreItems(IRIkey,IRI)
+dat<- cbind(IRIsc$scores, survey[1])
+clean.data <- merge(clean.data, dat, "user_id")
+```
+
+```{r Short Schwartzs Value Survey}
+SVS <- cbind(survey[,122:132], survey[1])
+SVS <- SVS[,-7]#take out attention check
+
+SVSkey <- list(
+  POWER <- "POWER",
+  SELF.DIRECTION <- "SELF.DIRECTION",
+  ACHIEVEMENT <- "ACHIEVEMENT",
+  HEDONISM <- "HEDONISM",
+  STIMULATION <- "STIMULATION",
+  UNIVERSALISM <- "UNIVERSALISM",
+  BENEVOLENCE <- "BENEVOLENCE",
+  TRADITION <- "TRADITION",
+  CONFORMITY <- "CONFORMITY",
+  SECURITY<- "SECURITY")
+
+names(SVSkey) <- c("POWER", "SELF.DIRECTION", "ACHIEVEMENT", "HEDONISM", "STIMULATION", 
+"UNIVERSALISM", "BENEVOLENCE", "TRADITION", "CONFORMITY", "SECURITY")
+
+SVSsc <- scoreItems(SVSkey,SVS)
+dat<- cbind(SVSsc$scores, survey[1])
+
+clean.data <- merge(clean.data, dat, "user_id")
+```
+
+```{r Lombrozo Moral Commitments task}
+#need to fix how is scored
+MC <- cbind(survey[,133:138], survey[1])
+
+Results = list()
+for (i in 1:6){
+  totals <- apply(MC[i],1,sum)
+  Results[[i]] = totals 
+}
+
+TEST = do.call(rbind, Results)
+colnames(TEST) = survey[,"user_id"]
+rownames(TEST) <- c('Lying','Assasination','Torture','Murder','Stealing','ForcedSterilization')
+TEST <-  as.data.frame(t(TEST))
+XX <- cbind(user_id = MC[,"user_id"], TEST)
+
+XX$consequentialism.score <- apply(XX[,2:6], 1, mean)
+XX$moral.commitment <- rep("Deontological", nrow(XX)) 
+XX$moral.commitment[XX$consequentialism.score >.5] = "Consequentialist" 
+XX$moral.commitment <- as.factor(XX$moral.commitment)
+XX$moral.commitment <- relevel(XX$moral.commitment, "Deontological")
+
+clean.data <-  merge(clean.data, XX, "user_id")
+```
+
+```{r Subjective Numeracy Scale (SNS)}
+SNS <- cbind(survey[,168:175], survey[1])
+
+SNSList <- list(
+  SNS.total <- SNS[,c(1,2,3,4,5,6,7,8)],
+  SNS.ability <- SNS[,c(1,2,3,4)],
+  SNS.preference <- SNS[,c(5,6,7,8)]
+)
+
+Results = list()
+for (i in 1:3){
+  totals <- apply(SNSList[[i]], 1, mean)
+  Results[[i]] = totals 
+}
+
+TEST = do.call(rbind, Results)
+colnames(TEST) = survey[,"user_id"]
+rownames(TEST) <- c('SNS.total','SNS.ability','SNS.preference')
+TEST <-  as.data.frame(t(TEST))
+XX <- cbind(user_id = SNS[,"user_id"], TEST)
+
+clean.data <-  merge(clean.data, XX, "user_id")
+```
+
+```{r Berlin Numeracy Test}
+Berlin.Numeracy.Test<- cbind(survey[, 176:179], survey[1])
+#Scoring = Based on answers to 1-4 questions following
+#Correct answers are as follows: 
+#1 = 25; 2 = 30; 3 =20; 4 = 50.
+Berlin <- c("Berlin1","Berlin2","Berlin3","Berlin4")
+Berlin.Numeracy.Test$Berlin1<- ifelse(Berlin.Numeracy.Test$Berlin1 == 25, 1,0)  
+Berlin.Numeracy.Test$Berlin2<- ifelse(Berlin.Numeracy.Test$Berlin2 == 30, 1,0)  
+Berlin.Numeracy.Test$Berlin3<- ifelse(Berlin.Numeracy.Test$Berlin3 == 20, 1,0)  
+Berlin.Numeracy.Test$Berlin4<- ifelse(Berlin.Numeracy.Test$Berlin4 == 50, 1,0)  
+
+Berlin.Numeracy.Test$BerlinScore <- apply(Berlin.Numeracy.Test[,Berlin], 1, function(X) sum(X))
+clean.data <-  merge(clean.data, Berlin.Numeracy.Test, "user_id")
+```
+
+```{r GRiPs}
+GRiPs <- cbind(survey[,180:187], survey[1])
+
+GRiPs.key <- list(c("GRiPS_1", "GRiPS_2", "GRiPS_3", "GRiPS_4",
+                    "GRiPS_5", "GRiPS_6", "GRiPS_7", "GRiPS_8"))
+names(GRiPs.key) <- "GRiPs_Score"
+
+GRiPsSc <- scoreItems(GRiPs.key,GRiPs)
+dat<- cbind(GRiPsSc$scores, survey[1])
+clean.data <- merge(clean.data, dat, "user_id")
+```
+
+```{r Political Orientation}
+Political.Orientation <-  cbind(survey[, 117:121], survey[1]) %>% 
+   mutate(conservatismFactor = republican + conservative - democrat - liberal)
+clean.data <-  merge(clean.data, Political.Orientation, "user_id")
+```
+
+```{r Demographics}
+Demographics <-  cbind(survey[, 98:116], survey[1])
+
+Demographics$Income <-as.character(Demographics$Income) 
+Demographics$Income <- str_remove(Demographics$Income, "[>,]")
+Demographics$Income<- str_trim(Demographics$Income)
+Demographics$Income <- as.numeric(Demographics$Income)
+
+Demographics$education <- factor(Demographics$education,  
+                       labels = c("less than high school",
+                                  "high school degree", 
+                                  "bachelor", 
+                                  "masters", 
+                                  "Doctoral/Professional"),
+                       levels = c(1,2,3,4,5))
+Demographics %>% 
+  mutate(education = fct_recode(education,
+  HighSchool = "high school degree",
+  Undergraduate = "bachelor",
+  Postgraduate = "masters",
+  Postgraduate = "Doctoral/Professional"
+)) -> Demographics
+
+clean.data <-  merge(clean.data, Demographics, "user_id")
+
+clean.data$sex <- factor(clean.data$sex,  
+                       labels = c("Male", 
+                                  "Female", 
+                                  "Other"),
+                       levels = c(1,2,3))
+
+clean.data$race_ethnicity <- factor(clean.data$race_ethnicity,
+                             labels = c("Black", 
+                                        "White", 
+                                        "Hispanic or Latino",
+                                        "Asian",
+                                        "Native Hawaiian/Pacific Islander",
+                                        "American Indian/Alaska Native",
+                                        "Mixed",
+                                        "Other",
+                                        "Prefer not to say"),
+                             levels = c(1,2,3,4,5,6,7,8,9))
+
+clean.data$Political_Party <- factor(clean.data$Political_Party,  
+                       labels = c("Democrat", 
+                                  "Republican", 
+                                  "Independent",
+                                  "Other"),
+                       levels = c(1,2,3,4))
+
+clean.data$RelationshipStatus <- factor(clean.data$RelationshipStatus,  
+                       labels = c("Single", 
+                                  "In a Relationship", 
+                                  "Married",
+                                  "Widowed",
+                                  "Divorced",
+                                  "Other"),
+                       levels = c(1,2,3,4,5,6))
+
+clean.data$ReligionRaised <- factor(clean.data$ReligionRaised,  
+                       labels = c("Christianity", 
+                                  "Judaism", 
+                                  "Islam",
+                                  "Unitarian Universal",
+                                  "Buddhism",
+                                  "Hinduism",
+                                  "Agnosticism", 
+                                  "Athesism", 
+                                  "Humanism",
+                                  "Paganism",
+                                  "None",
+                                  "Other"),
+                       levels = c(1,2,3,4,5,6,7,8,9,10,11,12))
+
+clean.data$ReligionNow <- factor(clean.data$ReligionNow,  
+                       labels = c("Christianity", 
+                                  "Judaism", 
+                                  "Islam",
+                                  "Unitarian Universal",
+                                  "Buddhism",
+                                  "Hinduism",
+                                  "Agnosticism", 
+                                  "Athesism", 
+                                  "Humanism",
+                                  "Paganism",
+                                  "None",
+                                  "Other"),
+                       levels = c(1,2,3,4,5,6,7,8,9,10,11,12))
+
+clean.data$HumanMind <- factor(clean.data$HumanMind,
+                        labels = c("Computers", 
+                                  "Souls"),
+                        levels = c(0,1))
+clean.data$Optimize <- factor(clean.data$Optimize,
+                       labels = c("No", 
+                                  "Yes"),
+                       levels = c(0,1))
+
+clean.data$AttendChurch <- factor(clean.data$AttendChurch,  
+                       labels = c("Never", 
+                                  "Once a year or less", 
+                                  "A few times a year",
+                                  "A few times a month",
+                                  "Once a week",
+                                  "More than once a week"),
+                       levels = c(1,2,3,4,5,6))
+
+clean.data$ReligiousActivity <- factor(clean.data$ReligiousActivity,  
+                       labels = c("Never", 
+                                  "Once a year or less", 
+                                  "A few times a year",
+                                  "A few times a month",
+                                  "Once a week",
+                                  "More than once a week"),
+                       levels = c(1,2,3,4,5,6))
+
+clean.data$meditation <- factor(clean.data$meditation,  
+                       labels = c("Never", 
+                                  "Once a year or less", 
+                                  "A few times a year",
+                                  "A few times a month",
+                                  "Once a week",
+                                  "More than once a week"),
+                       levels = c(1,2,3,4,5,6))
+
+clean.data$Religiosity <- factor(clean.data$Religiosity,  
+                       labels = c("Not Religious", 
+                                  "Somewhat Religious", 
+                                  "Very Religious",
+                                  "Extremely Religious"),
+                       levels = c(1,2,3,4))
+
+clean.data$Spirituality <- factor(clean.data$Spirituality,  
+                       labels = c("Not Spiritual", 
+                                  "Somewhat Spiritual", 
+                                  "Very Spiritual",
+                                  "Extremely Spiritual"),
+                       levels = c(1,2,3,4))
+```
+
+```{r merging cleaned survey and task data}
+user_n <- factor(clean.data$user_id) 
+str(user_n)
+Neuroethics_Judgement = clean.data
+#write.csv(Neuroethics_Judgement,paste("../data/Cleaned_Pilot/",'eda.csv',sep = ""))
+save(Neuroethics_Judgement, file = paste("../data/Cleaned_Pilot/exclusions.2020.10.21.RData"))
+```
+
+
+```{r Individual subject visual data check}
+user_id <- factor(Neuroethics_Judgement$user_id)
+i = "0S8GLGuB"
+
+for (i in user_id){
+  sub = filter(Neuroethics_Judgement, user_id == i) %>% 
+    filter(experimental_treatment_selected == "Yes to treatment")
+##Density Plots for risk, gain, and no effect
+  p1 = ggdensity(sub, 
+          main = paste("subject: ",toString(i)),
+          x = "risk",
+          ylab = "Response Density",
+          xlab = "Probability of loss (risk)",
+          legend.title = "",
+          xticks.by = 10,
+          #add = "median", rug = TRUE, #note we should make this med
+          color = "experimental_treatment_selected", 
+          fill ="experimental_treatment_selected", 
+          palette = c("#0C7BDC"))
+          ggpar(p1,xlim = c(0,95)) -> p1
+          
+  p3 = ggdensity(sub, 
+          x = "gain",
+          ylab = "Response Density",
+          xlab = "Probability of Gain (benefit)",
+          legend = "none",
+          xticks.by = 10,
+          #add = "median", rug = TRUE,
+          color = "experimental_treatment_selected", 
+          fill ="experimental_treatment_selected", 
+          palette = c("#0C7BDC")) #FFC20A
+          ggpar(p3,xlim = c(0,95)) -> p3
+
+  p5 = ggdensity(sub, 
+          x = "no_effect",
+          ylab = "Response Density",
+          xlab = "Probability of no effect (ambiguity)",
+          legend = "none",
+          xticks.by = 10,
+          #add = "median", rug = TRUE,
+          color = "experimental_treatment_selected", 
+          fill ="experimental_treatment_selected", 
+          palette = c("#0C7BDC"))
+          ggpar(p5,xlim = c(0,95)) -> p5
+
+
+  png(filename = paste0(i , ".png"),
+    width = 1234, height = 468)
+  multiplot(p1, p3, p5, cols=3)
+  dev.off()
+}
+```
+
+```{r plot RT, eval=FALSE}
+#table(clean.data$user_id) Sanity Check
+clean.data$user_id = factor(clean.data$user_id)
+RT = select_(clean.data,"user_id", "rt", "trial_index")
+summary(RT)
+##Plots for RT 
+data_long = melt(RT, 
+                 id=c("user_id","trial_index"),
+                 measure=c("rt"))
+
+summary(data_long)
+
+ggplot(data_long, aes(trial_index, value)) +
+  stat_summary(fun = mean, geom = "line") +
+  stat_summary(fun.data=mean_se, geom = "pointrange") +
+  scale_y_continuous("RT (milliseconds)") +
+  theme(axis.text.x = element_text(angle=65, vjust=0.6)) +
+  labs(title="", 
+       subtitle="",
+       caption="",
+       x="Trial Number",
+       y="RT (milliseconds)")
+```
+
+```{r marginal effects, message=FALSE, warning=FALSE}
+#calculate average marginal effects
+m.marginal <-  by(logit.data, logit.data$user_id, function(x) logitmfx(treatment ~ risk.c + gain.c, control=glm.control(maxit=50), data = x))
+
+user_id <- names(m.marginal)
+marginal.effect <- list()
+n = 689
+for (i in 1:n){
+dat = m.marginal[[i]]$mfxest[c(1,2,7,8)]
+  marginal.effect[[i]] = dat
+}
+subjectModels.marginal <- do.call(rbind, marginal.effect)
+colnames(subjectModels.marginal) <-  c("marginal.effect.risk", "marginal.effect.gain", "marginal.effect.P.risk","marginal.effect.P.gain")
+
+subjectModels.marginal <- cbind.data.frame(user_id, subjectModels.marginal)  
+
+clean.data <-  merge(clean.data, subjectModels.marginal, "user_id")
+
+####calculate marginal effects of a representaitve
+##these are the MER plots for each subject
+#i = "jW5Hnnpw"
+logit.data %>% 
+  dplyr::select(user_id) %>% 
+  distinct() -> user_id
+user_id <- as.data.frame(user_id)
+pd <- position_dodge(0.2)
+
+for (i in user_id[1:138,1]){
+subject = filter(logit.data, user_id == i)  #pull out subject
+
+logit <- glm(treatment ~ risk + gain, data = subject, family = binomial(link = "logit")) #run logit model
+
+m.marginal <-  margins::margins(logit)
+
+#m.marginal <-  margins::margins(logit, at = list(risk = c(5, 10, 20, 30, 40, 50, 60, 70)))
+#m.marginal <-  margins::margins(logit, at = list(risk = c(5, 10, 20, 30, 40, 50, 60, 70) ,gain =  c(5, 10, 20, 30, 40, 50, 60, 70)))
+
+m.marginal %>% 
+  dplyr::select(risk,gain,dydx_risk, dydx_gain) %>% 
+    mutate(dydx_risk = -dydx_risk)%>% 
+    reshape2::melt(id = c("risk", "gain"), 
+         variable.name = "dydx", value.name = "MER") %>% 
+ reshape2::melt(id = c("dydx", "MER"), variable.name = "type", value.name = "index") -> test #resturcture the data
+
+
+plot <- test %>%
+  group_by(index,type) %>%
+  summarize(n = n(),
+            mean = median(MER),
+            sd = sd(MER),
+            se = sd/sqrt(n))
+ggplot(plot, 
+       aes(x = index, 
+           y = mean, 
+           group=type,
+           color=type)) +
+  geom_point(position=pd, 
+             size = 1) +
+  geom_line(position = pd, 
+            size = 1) +
+  geom_errorbar(aes(ymin = mean - se, 
+                    ymax = mean + se), 
+                width = .1, 
+                position = pd, 
+                size = 1) +
+  scale_color_brewer(palette="Set1") +
+  theme_minimal() +
+  labs(title = "Average Marginal Effect of a Representative Risk & Benefit Index",
+       subtitle =  paste("(median +/- standard error) Subject:",toString(i)),
+       x = "", 
+       y = "",
+       color = "Attribute")+
+  #geom_abline(intercept = 0 , slope = .00050, color="black", linetype="dashed", size=.5)+
+  facet_wrap(~ type, nrow = 2) +
+  scale_x_continuous("Probablitiy", breaks=seq(5,70,5), limits=c(5, 70))+ 
+  ggsave(filename = paste0(i , ".pdf"), path = "../images/MER_plots")
+  #scale_y_continuous("MER", breaks=seq(0,0.025,0.0025), limits=c(0,0.025))
+}
+
+persp(logit, risk = c(5, 10, 20, 30, 40, 50, 60, 70) , gain = c(5, 10, 20, 30, 40, 50, 60, 70))
+image(logit) 
+
+###### MER for each subject
+m.marginal <- by(logit.data, logit.data$user_id, function(x) margins::margins(glm(treatment ~ risk  + gain, data = x, family = binomial(link = "logit"))))
+
+m.marginal <- by(logit.data, logit.data$user_id, function(x) margins::margins(glm(treatment ~ risk + gain, data = x, family = binomial(link = "logit")), at = list(risk = c(5, 10, 20, 30, 40, 50, 60, 70) , gain =  c(5, 10, 20, 30, 40, 50, 60, 70))))
+
+#run logit model
+user_id <- names(m.marginal)
+
+marginal.effect <- list()
+
+n = nrow(logit.data)/75
+
+for (i in 1:n){
+dat = m.marginal[[i]]
+  marginal.effect[[i]] = dat
+}
+subjectModels.marginal <- do.call(rbind, marginal.effect)
+
+
+subjectModels.marginal %>% 
+  dplyr::select(user_id, risk,gain,dydx_risk, dydx_gain) %>% 
+    mutate(dydx_risk = -dydx_risk)%>% 
+    reshape2::melt(id = c("user_id","risk", "gain"), 
+         variable.name = "dydx", value.name = "MER") %>% 
+ reshape2::melt(id = c("user_id", "dydx", "MER"), variable.name = "type", value.name = "index") -> test #resturcture the data
+
+
+plot <- test %>%
+  group_by(user_id, index,type) %>%
+  summarize(n = n(),
+            mean = median(MER),
+            sd = sd(MER),
+            se = sd/sqrt(n))
+ggplot(plot, 
+       aes(x = index, 
+           y = mean, 
+           group=user_id,
+           color=user_id)) +
+  geom_point(position=pd, 
+             size = 1) +
+  geom_errorbar(aes(ymin = mean - se, 
+                    ymax = mean + se), 
+                width = .1, 
+                position = pd, 
+                size = 1) +
+  scale_color_brewer(palette="Set1") +
+  theme_minimal() +
+  labs(title = "Average Marginal Effect of a Representative Risk & Benefit Index",
+       subtitle =  paste("(median +/- standard error) Subject:",toString(i)),
+       x = "", 
+       y = "",
+       color = "Attribute")+
+  scale_x_continuous("Probablitiy", breaks=seq(5,70,5), limits=c(5, 70))
+
+```
+
+
+
+```{r fitted logit by subject, warning=F}
+user_id <- factor(Neuroethics_Judgement$user_id)
+
+n = 425
+probability.of.treatment <- list()
+
+i = "06BFVmlE"
+
+for (i in user_id){
+  sub = filter(Neuroethics_Judgement, user_id == i)
+predicted.data <- m.logit[[i]][["fitted.values"]]
+probability.of.treatment[i] <- predicted.data
+}
+
+
+subjectModels <- do.call(rbind, probability.of.treatment)
+colnames(subjectModels) <-  c('Intercept', 'Risk_Beta', 'Gain_Beta') #interaction removed
+subjectModels <- cbind.data.frame(user_id, subjectModels)
+
+
+
+
+for (i in user_id){
+  sub = filter(Neuroethics_Judgement, user_id == i)
+predicted.data <- data.frame(
+  probability.of.treatment=m.logit[[i]][["fitted.values"]],
+  treatment = sub$experimental_treatment_selected,
+  ratio = sub$ratio)
+probability.of.treatment[i] <- predicted.data
+
+predicted.data <- predicted.data[
+  order(predicted.data$probability.of.treatment, decreasing=FALSE),]
+predicted.data$rank <- 1:nrow(predicted.data)
+
+ggplot(data=predicted.data, aes(x=risk, y=probability.of.treatment)) +
+  geom_point(aes(color=treatment), alpha=1, shape=1, stroke=1) +
+  xlab("Index") +
+  ylab("Predicted probability choosing an experimental treatment") 
+#+ 
+ # ggsave(filename = paste0(i , ".pdf"), path = "../images/Fitted_Subjects")
+}
+i = "06BFVmlE"
+
+for (i in user_id){
+  sub = filter(subjectModels.marginal, user_id == i)
+predicted.data <- data.frame(
+  probability.of.treatment=sub$fitted,
+  treatment = sub$experimental_treatment_selected,
+  risk = sub$risk,
+  gain = sub$gain)
+
+predicted.data <- predicted.data[
+  order(predicted.data$probability.of.treatment, decreasing=FALSE),]
+predicted.data$rank <- 1:nrow(predicted.data)
+
+
+subjectModels.marginal %>% 
+  dplyr::select(user_id, risk,gain,fitted) %>% 
+    reshape2::melt(id = c("user_id","fitted"), 
+         variable.name = "type", value.name = "amount") %>% 
+  mutate(amount = amount/100)->test
+
+ggplot(data=test, aes(x=amount, y=fitted, fill = type, color = type)) +
+   stat_summary(fun = mean, geom = "line") +
+  stat_summary(fun.data=mean_se, geom = "pointrange") +  
+  scale_x_continuous("Objective Probabilities ", breaks=seq(0,1,.05), limits=c(0, 1)) +
+  scale_y_continuous("Subjective Probabilities", breaks=seq(0,1,.05), limits=c(0, 1)) +
+  geom_abline(intercept = 0, slope = 1, size = .25)+
+  theme_bw()+
+  theme(legend.position="none")
+
+
+# ggsave(filename = paste0(i , ".pdf"), path = "../images/Fitted_Subjects")
+}
+```
+
+
+```{r Model comparisons}
+user_id = names(subjectModel.2) #creates vector of user_id's 
+n= nrow(Neuroethics_Judgement)/75
+
+#loop an anove test of the interaction on base and ratio model
+datalist = list()
+for (i in 1:n){
+dat = anova(subjectModel.1[[i]],
+            subjectModel.2[[i]],
+            test="Chisq")
+  datalist[[i]] = dat
+}
+names(datalist) = user_id
+
+lapply(datalist, print) 
+lapply(subjectModel.2, summary)
+
+```
+
+```{r archive Pseduo R^2s, eval=FALSE, include=FALSE}
+source("../r_docs/logisticPseudoR2s.R")
+
+#loop the r^2 calculator on the fitted final model
+datalist.1 = list()
+for (i in 1:n){
+dat = logisticPseudoR2s(subjectModel.2[[i]])
+  datalist.1[[i]] = dat
+}
+```
+
+
+```{r Model Dignostics for best fitted model}
+#Diagnostics for model 2 (Residuals)
+#Interpreting residuaLs
+n=448
+i = "06BFVmlE"
+#Compute beta
+user_id <- names(m.logit)
+n = nrow(logit.data)/75
+n=425
+datalist.dignostics = list()
+predicted.probabilities <- list()
+
+for (i in user_id){
+dat = m.logit[[i]]$fitted
+  predicted.probabilities[[i]] = as.data.frame(dat, col.names = names(i))
+}
+
+mt1 <- as.data.frame(unlist(predicted.probabilities)) %>% 
+  rownames_to_column("user_id") %>% 
+  mutate(user_id = str_sub(user_id, 1, 8))
+
+colnames(mt1) <- c("user_id","predicted.probabilities")
+mt1$user_id <- factor(mt1$user_id)
+
+
+datalist.dignostics = list()
+for (i in user_id){
+  subjectDignostics = filter(clean.data, user_id == i)
+      subjectDignostics$predicted.probabilities<-m.logit[[i]]$fitted
+  datalist.dignostics[[i]] = subjectDignostics
+}
+datalist.dignostics = do.call(rbind, datalist.dignostics)
+
+datalist.dignostics$user_id <- factor(datalist.dignostics$user_id)
+
+datalist.dignostics %>% 
+ dplyr::select(user_id,ratio, predicted.probabilities) %>% 
+  #group_by(user_id) %>% 
+  summarize(n = n(),
+         mean = mean(predicted.probabilities),
+         avg_reject = (1 - mean)*100,
+         sd = sd(predicted.probabilities)) %>% na.omit()
+
+datalist.dignostics %>% 
+ dplyr::select(user_id,ratio, predicted.probabilities) %>% 
+  filter(predicted.probabilities > .5000000000)%>% 
+  #group_by(user_id) %>% 
+  summarise(n = n(),
+         mean = mean(ratio),
+         min = min(ratio)) %>% na.omit() -> plots
+
+ggplot(datalist.dignostics, aes(ratio, predicted.probabilities)) + 
+  scale_color_brewer(palette="Set1") +
+  stat_summary(fun.data = mean_se, geom = "pointrange", size= .45, alpha = 0.70, color = "blue")+
+  geom_hline(yintercept = 0.5,  color = "red", linetype="dashed")+
+  theme_bw(base_size = 9)+
+  scale_y_continuous("P(Treatment)", breaks=seq(0,1,.25), limits=c(0, 1))+
+  scale_x_continuous("Gain/Risk", breaks=seq(0,20,5), limits=c(0, 20))+
+  geom_vline(aes(xintercept=mean), color = "red",linetype="dashed", data=plots)+ 
+  annotate("text", x = 5.25, y = .25,
+  label = "paste(Gain/Risk, \" = 2.887\")", parse = TRUE,color = "red")
+
+
+```
+
+```{r plot the fitted models for each subject, eval=FALSE, include=FALSE}
+#Mutiple Plots
+source("../r_docs/Multiple_plot_function.R")
+
+for (i in user_id){
+  subject = filter(datalist.dignostics, user_id == i)
+
+  ggplot(subject, aes(x=risk, y= predicted.probabilities)) + 
+      stat_summary(fun = mean, geom = "line")+
+         scale_x_continuous(expand = c(0,0))
+  
+  ggplot(subject, aes(x=gain, y= predicted.probabilities)) + 
+      stat_summary(fun = mean, geom = "line")+
+         scale_x_continuous(expand = c(0,0))
+  
+    p1 = ggplot(subject, aes(x=risk, y= predicted.probabilities)) + 
+         geom_point(size = 4, alpha = .5,   position = "jitter") + 
+         stat_smooth(method="glm", se=FALSE, fullrange=TRUE, 
+              method.args = list(family=quasibinomial))+
+         scale_x_continuous(expand = c(0,0))+
+         theme(legend.position="none")
+
+    p2 = ggplot(subject, aes(x=gain, y= predicted.probabilities)) + 
+         geom_point(size = 4, alpha = .5, position = "jitter") +
+         stat_smooth(method="glm", se=FALSE, fullrange=TRUE, 
+              method.args = list(family=quasibinomial))+
+         scale_x_continuous(expand = c(0,0))+
+         theme(legend.position="none")
+
+    p3 = ggplot(subject,aes(x = risk , y = gain)) + 
+         geom_point(aes(color = experimental_treatment_selected), 
+                    size = 2.5, alpha = .7, position = "jitter") +
+         ggtitle(paste("75 Trials Pilot Subject: ",toString(i))) +
+         scale_x_continuous("Risk Probabilities",
+                            breaks=seq(0,100,5), limits=c(0, 100)) +
+         scale_y_continuous("Gain Probabilities", breaks=seq(0,100,5), 
+                            limits=c(0, 100)) + 
+         theme(legend.position="none")
+
+     png(filename = paste0(i , ".png"),
+       width = 1234, height = 468)
+     multiplot(p1, p2, p3, cols=2)
+     dev.off()
+}
+
+```
+
+
+```{r ARCHIVE Individual subject visual data check, eval=FALSE, include=FALSE}
+#Mutiple Plots
+source("../r_docs/Multiple_plot_function.R")
+
+#Individual Scatter: subject graph 
+for (i in user_id){
+  sub = filter(Neuroethics_Judgement, user_id == i)
+  
+g = ggplot(sub,aes(x = risk , y = gain)) + 
+  geom_point(aes(color = experimental_treatment_selected), size = 2.5, alpha = .7, position = "jitter") +
+  ggtitle(paste("75 Trials Pilot Subject: ",toString(i))) +
+  scale_x_continuous("Risk Probabilities", breaks=seq(0,100,5), limits=c(0, 100)) +
+  scale_y_continuous("Gain Probabilities", breaks=seq(0,100,5), limits=c(0, 100)) + 
+  theme(legend.position="none")
+  
+  png(filename = paste0(i , ".png"),
+      width = 500, height = 372)
+  print(g)
+  dev.off()
+}
+i = "0S8GLGuB"
+user_id <- factor(Neuroethics_Judgement$user_id)
+
+for (i in user_id){
+  sub = filter(Neuroethics_Judgement, user_id == i)
+##Density Plots for risk, gain, and no effect
+  p1 = ggdensity(sub, 
+          main = paste("subject: ",toString(i)),
+          x = "risk",
+          ylab = "Response Density",
+          xlab = "Probability of loss (risk)",
+          legend.title = "",
+          xticks.by = 10,
+          #add = "median", rug = TRUE, #note we should make this med
+          color = "experimental_treatment_selected", 
+          fill ="experimental_treatment_selected", 
+          palette = c("#FFC20A", "#0C7BDC"))
+          ggpar(p1,xlim = c(0,95)) -> p1
+          
+  p3 = ggdensity(sub, 
+          x = "gain",
+          ylab = "Response Density",
+          xlab = "Probability of Gain (benefit)",
+          legend = "none",
+          xticks.by = 10,
+          #add = "median", rug = TRUE,
+          color = "experimental_treatment_selected", 
+          fill ="experimental_treatment_selected", 
+          palette = c("#FFC20A", "#0C7BDC"))
+          ggpar(p3,xlim = c(0,95)) -> p3
+
+  p5 = ggdensity(sub, 
+          x = "no_effect",
+          ylab = "Response Density",
+          xlab = "Probability of no effect (ambiguity)",
+          legend = "none",
+          xticks.by = 10,
+          #add = "median", rug = TRUE,
+          color = "experimental_treatment_selected", 
+          fill ="experimental_treatment_selected", 
+          palette = c("#FFC20A", "#0C7BDC"))
+          ggpar(p5,xlim = c(0,95)) -> p5
+
+##Histograms for risk, gain, and no effect
+  p2=gghistogram(sub, 
+            x = "risk",
+            ylab = "Number of Occurrences",
+            xlab = "Probability of Loss (risk)",
+            add = "median", rug = TRUE,
+            fill = "experimental_treatment_selected",  palette = c("#FFC20A", "#0C7BDC"),
+            add_density = TRUE, bins = 30,
+            legend = "none",
+            xticks.by = 10)
+            ggpar(p2,xlim = c(0,95)) -> p2
+
+  p4=gghistogram(sub, 
+            x = "gain",
+            ylab = "Number of Occurrences",
+            xlab = "Probability of Gain (benefit)",
+            add = "median", rug = TRUE,
+            fill = "experimental_treatment_selected",  palette = c("#FFC20A", "#0C7BDC"),
+            add_density = TRUE, bins = 30,
+            legend = "none",
+            xticks.by = 10)
+            ggpar(p4,xlim = c(0,95)) -> p4
+
+  p6=gghistogram(sub, 
+            x = "no_effect",
+            alpha = .5,
+            ylab = "Number of Occurrences",
+            xlab = "Probability of no effect (ambiguity)",
+            add = "median", rug = TRUE,
+            fill = "experimental_treatment_selected",  palette = c("#FFC20A", "#0C7BDC"),
+            add_density = TRUE, bins = 30, 
+            legend = "none",
+            xticks.by = 10)
+            ggpar(p6,xlim = c(0,95)) -> p6
+
+
+  png(filename = paste0(i , ".png"),
+    width = 1234, height = 468)
+  multiplot(p1, p2, p3, p4, p5, p6, cols=3)
+  dev.off()
+}
+
+ png(filename = paste0(i , ".png"),
+    width = 1234, height = 468)
+  multiplot(p2, p1, p4, p3, p6,p5,  cols=3)
+  dev.off()
+  
+#Ratio plots
+for (i in user_id){
+  sub = filter(Neuroethics_Judgement, user_id == i)
+  
+##Density plot  
+  p1 = ggdensity(sub, 
+               x = "ratio",
+               legend.title = paste("75 Trials Pilot Subject: ",toString(i)),
+               add = "mean", rug = TRUE,
+               color = "experimental_treatment_selected", 
+               fill ="experimental_treatment_selected", 
+               palette = c("#f8766d", "#00bfc4"),
+               xticks.by = 1)
+##Histogram
+  p2 = gghistogram(sub, 
+            x = "ratio",
+            alpha = .5,
+            ylab = "Number of Occurrences",
+            add = "mean", rug = TRUE,
+            fill = "experimental_treatment_selected",  palette = c("#f8766d", "#00bfc4"),
+            add_density = TRUE, bins = 200,
+            legend = "none", 
+            xticks.by = 1)
+  
+  png(filename = paste0(i , ".png"),
+    width = 1234, height = 468)
+  multiplot(p1, p2, cols=1)
+  dev.off()
+}
+```

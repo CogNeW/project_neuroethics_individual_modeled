@@ -1,0 +1,380 @@
+---
+title: "Individual Differences"
+author: "Kianté Fernandez"
+date: "2/1/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+#load libraries
+library(tidyverse)
+library(gghalves)
+library(here)
+library(broom)
+library(kableExtra)
+library(pairwiseComparisons)
+library(psych)
+library(ggpubr)
+```
+
+```{r set specifications}
+# Disable scientific notation
+options(scipen=999)
+source(here("ext", "lm_test.R"))
+```
+
+```{r load data}
+Neuroethics_Judgement <- read.csv(here("data", "Cleaned_Pilot", "clean_data_long.csv"), stringsAsFactors=TRUE)
+data <- Neuroethics_Judgement %>% dplyr::select("user_id", "condition", "sex", "age", "education","ReligionRaised", "ReligionNow", "Spirituality", "AttendChurch", "ReligiousActivity", "meditation", "Religiosity","Political_Party", "conservatismFactor", "Harm", "Fairness", "Loyalty", "Athority", "Sancticy", "cor_pearson", "Yes", "No", "Risk_Beta", "Gain_Beta", "risk_average_marginal_effect", "risk_Std_Err", "risk_z", "risk_P..z.", "gain_average_marginal_effect", "gain_Std_Err", "gain_z", "gain_P..z.") %>% distinct() %>% 
+   mutate(dominate = ifelse(Yes >= 75 *.90 | No >= 75 *.90, "dominate", "not_dominate")) %>% 
+   filter(!dominate == "dominate")
+```
+
+```{r religious variable}
+#calculate Religion
+data %>% 
+   dplyr::select(user_id, ReligionRaised, ReligionNow, Religiosity, Spirituality, 
+AttendChurch, ReligiousActivity) -> data.religious
+
+data.religious$AttendChurch <-
+  recode_factor(data.religious$AttendChurch,
+              `1` = "Never", 
+              `2` = "Once a year or less", 
+              `3` = "A few times a year",
+              `4` = "A few times a month", 
+              `5` = "Once a week", 
+              `6` = "More than once a week", .ordered = TRUE)
+
+data.religious$ReligiousActivity <-
+  recode_factor(data.religious$ReligiousActivity,
+              `1` = "Never", 
+              `2` = "Once a year or less", 
+              `3` = "A few times a year",
+              `4` = "A few times a month", 
+              `5` = "Once a week", 
+              `6` = "More than once a week", .ordered = TRUE)
+
+data.religious$Religiosity <-
+  recode_factor(data.religious$Religiosity,
+              `1` = "Not Religious", 
+              `2` = "Somewhat Religious", 
+              `3` = "Very Religious",
+              `4` = "Extremely Religious", .ordered = TRUE)
+
+data.religious$Spirituality <-
+  recode_factor(data.religious$Spirituality,
+              `1` = "Not Spiritual", 
+              `2` = "Somewhat Spiritual", 
+              `3` = "Very Spiritual",
+              `4` = "Extremely Spiritual", .ordered = TRUE)
+              
+religious <- data.matrix(data.religious[,c("Religiosity", "Spirituality", "AttendChurch", "ReligiousActivity")]) - 1
+
+#Kaiser-Meyer-Olkin factor adequacy
+KMO <- psych::KMO(religious)
+KMO
+KMO$ImCov
+#	Bartlett's Test of Sphericity
+REdaS::bart_spher(religious)
+
+scree <- psych::polychoric(religious)$rho
+evals <- eigen(scree)$values
+print(scree, cutoff = "0.3")
+psych::scree(scree, factors = F)
+
+EFA <- fa(religious, nfactors = 1, rotate = "oblimin", fm ="ml")
+print(EFA$loadings, cutoff = "0.4")
+#round(EFA$Phi, 3)
+(evals/sum(evals)*100)[1:4]
+EFA$communalities
+
+religious.efa <- fa(religious, nfactors = 1, rotate = "oblimin", fm ="ml", cor = "poly", scores = "regression")
+print(religious.efa)
+#fa.diagram(religious.efa)
+
+print(religious.efa$loadings, cutoff = "0.3")
+data$ReligiousFactor<- as.numeric(religious.efa$scores)
+```
+
+```{r variable prep, echo=FALSE}
+#relevel
+data$Political_Party <- relevel(data$Political_Party, "Democrat")
+data$Religiosity <- relevel(data$Religiosity, "Not Religious")
+#rename
+names(data)[names(data) == 'Sancticy'] <- 'Sanctity'
+names(data)[names(data) == 'Athority'] <- 'Authority'
+
+#potential outliers from cook's D
+#data = data[c(-117,-301, -405),]
+
+#check the residuals 
+#ggResidpanel::resid_panel(lm.political.risk, plots = "all")
+data = data[-329,]#gain outlier. Has influence on results
+#data= filter(data, !user_id == "xTDQTle7")
+data= filter(data, !user_id == "fhdEZjgH") #all zeros for moral foundations
+```
+
+
+```{r calculate regressions}
+#get the names of the variables
+expl = names(data)[12:19]
+expl = append(expl, "ReligiousFactor")
+#run risk models
+models_risk = expl %>% 
+  set_names() %>% 
+  map(risk_lm_test)
+
+#take a look
+map(models_risk, summary) -> f
+
+map(f, pluck("fstatistic")) #get all the F stats!!
+
+map_df(models_risk, glance)
+map_df(models_risk, tidy)
+
+#run gain models
+models_gain = expl %>% 
+  set_names() %>% 
+  map(gain_lm_test)
+
+map(models_gain, summary)
+
+#take a look
+map_df(models_gain, glance)
+map_df(models_gain, tidy)
+
+```
+For moral intuitions, hypothesized higher scores on foundations of Authority, Loyalty, and Sanctity will be more risk sensitive than those who score high on Harm and Fairness.
+
+Take the average AVE of each of these grouped by the scores in 5 bins each, and test for differences?
+```{r plot the Moral Foundations}
+data %>% 
+  dplyr::select("user_id", "Harm", "Fairness", "Loyalty", "Authority", "Sanctity") %>% 
+  reshape2::melt(id = "user_id" , variable.name = "value", value.name = "score") -> plotdata
+
+plotdata <- merge(data[,c("user_id", "risk_average_marginal_effect")], plotdata, "user_id")
+
+ggplot(plotdata, aes(score,risk_average_marginal_effect, group = value, color = value))+
+  geom_point()+
+  geom_smooth(method = "lm",color = "black")+
+  facet_wrap(~value)+
+  theme_minimal() +
+  labs(title = "Average Marginal Effect of Risk by Moral Foundations",
+       x = "Score", 
+       y = "Average Marginal Effect: Risk",
+       color = "Attribute")+
+  theme(legend.position="none")+
+  geom_hline(yintercept = 0, linetype="dashed", size=.25)
+
+###gain
+plotdata <- merge(data[,c("user_id", "gain_average_marginal_effect")], plotdata, "user_id")
+
+ggplot(plotdata, aes(score,gain_average_marginal_effect, group = value, color = value))+
+  geom_point()+
+  geom_smooth(method = "lm", color = "black")+
+  facet_wrap(~value)+
+  theme_minimal() +
+  labs(title = "Average Marginal Effect of Gain by Moral Foundations",
+       x = "Score", 
+       y = "Average Marginal Effect: Gain",
+       color = "Attribute")+
+  theme(legend.position="none")+
+  geom_hline(yintercept = 0, linetype="dashed", size=.25)
+```
+
+
+```{r map graphs}
+#"conservatismFactor", "Harm", "Fairness", "Loyalty", "Authority", "Sancticy","ReligiousFactor"
+response = names(data)[c(25,29)]
+expl = names(data)[12:19]
+expl = append(expl, "ReligiousFactor")
+
+all_plots = map(response,
+                ~map(expl, plot_fun, y = .x) )
+all_plots
+```
+
+```{r}
+#use this template to create individual graphs as needed for presentations
+# ggplot(data, aes(x=ReligiousFactor, y=risk_average_marginal_effect)) +
+#     geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+#     geom_jitter() + 
+#     labs(x = "Religious Factor", 
+#        y = "Average Marginal Effect: Risk", 
+#        title  = "Average Marginal Effect of Risk by Religious Factor")+
+#       theme_minimal()+
+#   stat_regline_equation(label.y = -0.02,
+#                         label.x = 1,
+#                         aes(label = ..eq.label..)) +
+#   stat_regline_equation(label.y = -0.025,
+#                         label.x = 1,
+#                         aes(label = ..rr.label..))
+# 
+# summary(lm(risk_average_marginal_effect~ poly(Fairness,2), data = data))
+```
+
+```{r descriptive}
+#calculate the descriptive
+Neuroethics_Judgement %>% 
+  dplyr::select(user_id, sex, age, race_ethnicity, education, Income, time2completion, Yes, No) %>% 
+  mutate(dominate = ifelse(Yes >= 75 *.90 | No >= 75 *.90, "dominate", "not_dominate")) %>% 
+  filter(!dominate == "dominate") %>% 
+  distinct() -> demographics
+paste(report::report_participants(demographics, spell_n = TRUE))
+```
+
+```{r}
+data %>% 
+na.omit() %>% 
+  dplyr::select(conservatismFactor, Political_Party) %>% 
+   gtsummary::tbl_summary(by = Political_Party) %>% 
+   gtsummary::add_n() %>%
+   gtsummary::as_gt()
+
+data %>% 
+na.omit() %>% 
+  dplyr::select(ReligiousFactor, Political_Party) %>% 
+   gtsummary::tbl_summary(by = Political_Party) %>% 
+   gtsummary::add_n() %>%
+   gtsummary::as_gt()
+
+data %>% 
+na.omit() %>% 
+  dplyr::select(Yes, No, risk_average_marginal_effect, gain_average_marginal_effect) %>%
+  correlation::correlation() %>% 
+  kable()%>%  
+  kableExtra::kable_styling(latex_options = "hold_position")
+
+data %>% 
+na.omit() %>% 
+  dplyr::select(risk_average_marginal_effect,gain_average_marginal_effect,Harm, Fairness, Loyalty, Authority, Sanctity, conservatismFactor, ReligiousFactor)-> cor
+
+cor <- cor(cor)
+r <- cor(cor, use="complete.obs")
+
+round(r,2)
+library(ggcorrplot)
+ggcorrplot(r, 
+           hc.order = TRUE, 
+           type = "lower",
+           lab = TRUE, sig.level = 0.05,insig = "blank")
+# p.mat <- cor_pmat(cor)
+# p.mat
+# 
+# # Leave blank on no significant coefficient
+# ggcorrplot(r, p.mat = p.mat, hc.order = TRUE,
+#     type = "lower", insig = "blank", lab = TRUE)
+```
+
+```{r broken stick regressions Risk, eval=FALSE, include=FALSE}
+data %>% 
+  select(risk_average_marginal_effect, conservatismFactor) %>% 
+  mutate(knot = as.factor(ifelse(conservatismFactor >= 0, 1, 0)))-> test
+test = test[c(-117,-404),]
+
+m1 = lm(risk_average_marginal_effect ~ conservatismFactor+knot, data = test)
+m2 = lm(risk_average_marginal_effect ~ conservatismFactor*knot, data = test)
+anova(m1,m2)
+knot1 = broom::glance(m2)
+ggplot(test, aes(conservatismFactor, risk_average_marginal_effect, group = knot, fill = knot))+
+  geom_point()+
+  geom_smooth(method = "lm",se =F, color = "red")+ theme_minimal()
+
+
+data %>% 
+  select(risk_average_marginal_effect, conservatismFactor) %>% 
+  mutate(knot = as.factor(ifelse(conservatismFactor > 0, 1, 0)))-> test
+test = test[c(-117,-404),]
+
+m1 = lm(risk_average_marginal_effect ~ conservatismFactor+knot, data = test)
+m2 = lm(risk_average_marginal_effect ~ conservatismFactor*knot, data = test)
+anova(m1,m2)
+knot2 = broom::glance(m2)
+
+ggplot(test, aes(conservatismFactor, risk_average_marginal_effect, group = knot, fill = knot))+
+  geom_jitter()+
+  geom_smooth(method = "lm", se =F, color = "red")+ theme_minimal()
+
+knots = rbind(knot1, knot2)
+knots
+#ggResidpanel::resid_panel(m2, plots = "all")
+broom::tidy(m2) %>% 
+  kable()%>%  
+  kableExtra::kable_styling(latex_options = "hold_position")
+```
+
+```{r broken stick regressions Benifits, eval=FALSE, include=FALSE}
+data %>% 
+  select(gain_average_marginal_effect, conservatismFactor) %>% 
+  mutate(knot = as.factor(ifelse(conservatismFactor >= 0, 1, 0)))-> test
+test = test[c(-116-329),]
+
+m1 = lm(gain_average_marginal_effect ~ conservatismFactor+knot, data = test)
+m2 = lm(gain_average_marginal_effect ~ conservatismFactor*knot, data = test)
+anova(m1,m2)
+knot1 = broom::glance(m2)
+ggResidpanel::resid_panel(m2, plots = "all")
+
+ggplot(test, aes(conservatismFactor, gain_average_marginal_effect, group = knot, fill = knot))+
+  geom_jitter()+
+  geom_smooth(method = "lm",se =F, color = "red")+ theme_minimal()
+
+
+data %>% 
+  select(gain_average_marginal_effect, conservatismFactor) %>% 
+  mutate(knot = as.factor(ifelse(conservatismFactor > 0, 1, 0)))-> test
+test = test[c(-116-329),]
+
+m1 = lm(gain_average_marginal_effect ~ conservatismFactor+knot, data = test)
+m2 = lm(gain_average_marginal_effect ~ conservatismFactor*knot, data = test)
+anova(m1,m2)
+knot2 = broom::glance(m2)
+ggResidpanel::resid_panel(m2, plots = "all")
+
+ggplot(test, aes(conservatismFactor, gain_average_marginal_effect, group = knot, fill = knot))+
+  geom_jitter()+
+  geom_smooth(method = "lm", se =F, color = "red")+ theme_minimal()
+
+knots = rbind(knot1, knot2)
+knots
+#ggResidpanel::resid_panel(m2, plots = "all")
+broom::tidy(m2) %>% 
+  kable()%>%  
+  kableExtra::kable_styling(latex_options = "hold_position")
+```
+
+```{r trying more peicewise regressions, eval=FALSE, include=FALSE}
+library(plotly)
+library(segmented)
+
+data %>% 
+  select(risk_average_marginal_effect, conservatismFactor) %>% 
+  mutate(knot = ifelse(conservatismFactor > 0, 1, 0)) %>% 
+  mutate(X = conservatismFactor*knot)-> test
+test = test[c(-117,-404),]
+m0 = lm(risk_average_marginal_effect ~ conservatismFactor, data = test)
+m1 = lm(risk_average_marginal_effect ~ conservatismFactor+X, data = test)
+m2 = lm(risk_average_marginal_effect ~ conservatismFactor*X, data = test)
+anova(m0,m1,m2)
+knot1 = broom::glance(m1)
+ggplot(test, aes(conservatismFactor, risk_average_marginal_effect, group = X))+
+  geom_point()+
+  geom_smooth(method = "lm",se =F, color = "red")+ theme_minimal()
+
+plot(risk_average_marginal_effect~conservatismFactor, test)
+lines(test$conservatismFactor, predict(m1), col = "blue")
+#equatiomatic::extract_eq(m1,   intercept = "beta",  use_coefs = T,  coef_digits = 5)
+
+fit = lm(risk_average_marginal_effect ~ conservatismFactor, data = test)
+
+fit_seg <- segmented(fit, seg.Z = ~conservatismFactor, psi = list(conservatismFactor=0))
+
+summary(fit_seg)
+
+plot_ly(test,x=~conservatismFactor,
+        y=~risk_average_marginal_effect,
+        type="scatter") %>% add_lines(x =  ~conservatismFactor, y = fitted(fit_seg))
+```
+
+$\begin{aligned}\operatorname{\log\left[ \frac { P( \operatorname{treatment}) }{ 1 - P( \operatorname{treatment}) } \right]}  &\sim N \left(\mu, \sigma^2 \right) \\ \mu &=\beta_{0i} + \beta_{1i}(\operatorname{risk}) + \beta_{2i}(\operatorname{gain}) \\\beta_{0j}  &\sim N \left(\mu_{\beta_{i}}, \sigma^2_{\beta_{j}} \right) \text{, for Individual i = 1,} \dots \text{,I} \end{aligned}$

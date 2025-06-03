@@ -1,0 +1,216 @@
+---
+title: "testing_data"
+author: "Kianté Fernandez"
+date: "2/25/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(here)
+library(lme4)
+library(patchwork)
+library(afex)
+library(doParallel)
+library(kableExtra)
+library(knitr)
+```
+
+```{r}
+Neuroethics_Judgement <- read.csv(here("data", "Cleaned_Pilot", "clean_data_long.csv"), stringsAsFactors=TRUE)
+data <- Neuroethics_Judgement %>% dplyr::select(user_id, condition, gain, risk, experimental_treatment_selected, conservatismFactor) %>% 
+  mutate(experimental_treatment_selected = ifelse(experimental_treatment_selected == "Yes to treatment", 1, 0))
+
+#data <- data %>% filter(risk <= 45 & gain <= 45)
+  
+  
+continuous <- c("risk", "gain")
+```
+
+```{r}
+ggplot(data, aes(risk, gain)) + geom_point() + theme_minimal()
+
+p1 <- data %>% ggplot(aes(risk, fill = condition)) + geom_histogram(bins = 9, color  = "black",  fill="#ee7c2e") + theme_minimal()+
+  facet_wrap(~ experimental_treatment_selected)
+  
+p2 <- data %>% ggplot(aes(gain)) + geom_histogram(bins = 9, color  = "black", fill="#4673c3") + theme_minimal()+  facet_wrap(~experimental_treatment_selected)
+```
+
+```{r}
+library(ggridges)
+
+p6 <- data %>%
+  filter(experimental_treatment_selected == 1) %>% 
+  ggplot(aes(risk, y =condition, fill = condition)) + geom_density_ridges() + 
+  theme_ridges()+theme(legend.position = "none")
+
+p7 <- data %>%
+  filter(experimental_treatment_selected == 1) %>% 
+  ggplot(aes(gain, y =condition, fill = condition)) + geom_density_ridges() + 
+  theme_ridges()+
+  theme(legend.position = "none")
+
+(p6 / p7)
+# try a ggstatsplot::ggwithinstats() for all the cogntive domains to shown consistnently acorss
+
+```
+
+
+```{r}
+options(knitr.kable.NA = '')
+
+#data[,continuous] <- scale(data[,continuous]) #scale the data
+
+data <- data %>% #within subject scaling imporantntn when coviarite vlaues are differnenet, very differeney
+  group_by(user_id) %>%
+  mutate(risk = scale(risk),
+         gain = scale(gain)) %>% 
+  ungroup()
+
+m.1 <- glmer(experimental_treatment_selected ~ 1 + (risk + gain)*conservatismFactor + (1 + risk + gain| user_id), 
+             data = data, family = binomial(link="logit"), 
+             control=glmerControl(optimizer="bobyqa"),
+             nAGQ = 1)
+summary(m.1)
+# cl <- makeCluster(4)
+# clusterEvalQ(cl, require(lme4))
+# confi <- confint(m.1,method="boot", nsim = 1000)
+# stopCluster(cl)
+#save(confi, file = here("output", "Confidence_Intervals_for_Model_Parameters.RData"))
+
+# cl <- makeCluster(4)
+# clusterEvalQ(cl, require(afex))
+# lrMod1.lr <- mixed(experimental_treatment_selected ~ 1 + risk + gain + I(risk^2) + I(gain^2)+
+#                    (1 + risk + gain | user_id),
+#                    data=data,
+#                    family="binomial", method='LRT',
+#                    control=glmerControl(optimizer = "bobyqa"), 
+#                    nAGQ = 1)
+# stopCluster(cl)
+# 
+# lrMod1.lr
+
+#print(VarCorr(m.1),comp=c("Variance","Std.Dev."), digits=3)
+
+se <- sqrt(diag(vcov(m.1)))
+# table of estimates with 95% CI
+(tab <- cbind(Est = fixef(m.1), LL = fixef(m.1) - 1.96 * se, UL = fixef(m.1) + 1.96 * se)) %>% 
+  kable(caption = "95% Confidence Intervals for Fixed effect Parameters")%>%  
+  kableExtra::kable_styling(latex_options = "hold_position")
+
+#exp(tab) #we take the exponetial to get the odds rather than log odds
+broom.mixed::tidy(m.1)%>% 
+  kable(caption = "Summary of Fixed and Random Effects for Model")%>%  
+  kableExtra::kable_styling(latex_options = "hold_position")
+#getME(m.1, "theta")
+
+as.matrix(Matrix::bdiag(VarCorr(m.1))) %>%
+  kable(caption = "G Matrix for Random Effects")%>%  
+  kableExtra::kable_styling(latex_options = "hold_position")#Here is the G matrix
+```
+
+```{r subject models and graphs, fig.width= 11}
+set.seed(2022)
+p3 <- ggeffects::ggpredict(m.1, terms = c("risk", "gain [-1, 0, 1]","user_id [sample=25]"), type = "re") %>% 
+  ggplot(aes(x, predicted, color = facet, fill = factor(group)))+ 
+  geom_line()+
+  theme_bw()+
+  facet_grid(~ factor(group))+
+  labs(title = "Predicted Probability across risk and gain",
+       x = "Risk",
+       y = "Predicted Probability of Selecting Treatment",
+       color = "Subject ID") + geom_hline(yintercept = .50, linetype = "dashed")+
+   theme(legend.position="none")+
+  geom_smooth(method = "lm", aes(group = factor(group)), se = F, color = "black")
+
+p4 <- ggeffects::ggpredict(m.1, terms = c("risk", "gain [-1, 0 , 1]","user_id [sample=25]"), type = "re") %>% 
+  ggplot(aes(x, predicted, color = factor(group)))+ 
+  geom_line()+
+  facet_wrap(~facet)+
+  theme_bw()+
+  labs(title = "Predicted Probability by random sample of subjects",
+       x = "Risk",
+       y = "Predicted Probability",
+       color = "Gain")+
+  geom_hline(yintercept = .50, linetype = "dashed")
+
+(p1 | p2) / p3 | p4
+```
+
+```{r cats, fig.width= 11}
+cat_data <- Neuroethics_Judgement %>% dplyr::select(user_id, condition, gain, risk, experimental_treatment_selected) %>% 
+  mutate(experimental_treatment_selected = ifelse(experimental_treatment_selected == "Yes to treatment", 1, 0)) %>% 
+  mutate(risk = factor(risk),
+         gain = factor(gain))
+
+#cat_data <- cat_data %>% filter(risk <= 45 & gain <= 45)
+
+cat.m <- glmer(experimental_treatment_selected ~ 1 + risk + gain +
+             (1 | user_id), 
+             data = cat_data, family = binomial(link="logit"), 
+             control=glmerControl(optimizer="bobyqa"),
+             nAGQ = 1)
+
+cats <- ggeffects::ggpredict(cat.m, terms = c("risk[all]", "gain[all]"))
+  ggplot(cats, 
+       aes(x = group, 
+           y = predicted,
+           fill = x)) + 
+  geom_bar(stat = "identity",position = "dodge", color = "black")+
+    labs(title = "Predicted Probability",
+       x = "Gain",
+       y = "Predicted Probability",
+       fill = "Risk")+
+  geom_hline(yintercept = .50, linetype = "dashed")+
+    theme_bw()+
+    facet_wrap(~x)
+
+broom.mixed::tidy(cat.m)%>% 
+  kable(caption = "Summary of Fixed and Random Effects for Categorical Model")%>%  
+  kableExtra::kable_styling(latex_options = "hold_position")
+```
+
+```{r checking other bathes}
+read.csv(here("data", "Cleaned_Pilot", "Post_hoc_risk_test_all_batches.csv"), header=TRUE, comment.char="#", stringsAsFactors=TRUE) %>% 
+  filter(batch == 1 | batch == 2 | batch == 3 | batch == 4) -> batch.total
+```
+
+```{r}
+ggeffects::ggpredict(m.1, terms = c("risk [all]","user_id [sample=200]"), type = "re") %>% 
+    left_join(distinct(select(data, user_id, conservatismFactor)), by = c("group" = "user_id")) %>% 
+  ggplot(aes(x, predicted, color = factor(group)))+ 
+  geom_line()+
+  facet_wrap(~conservatismFactor)+
+  theme_bw()+
+  labs(title = "Predicted Probability by Conservatism",
+       x = "Risk",
+       y = "Predicted Probability",
+       color = "Subject")+
+  geom_hline(yintercept = .50, linetype = "dashed")+
+     theme(legend.position="none")
+
+
+
+subject_models <- do.call(rbind.data.frame, ranef(m.1)) %>%
+  rownames_to_column() %>%
+  mutate(user_id = factor(str_remove(rowname, "user_id."))) %>%
+  mutate(Intercept = `(Intercept)` + fixef(m.1)[["(Intercept)"]],
+         risk = risk + fixef(m.1)[["risk"]],
+         gain = gain + fixef(m.1)[["gain"]]) %>%
+    select(-c(rowname, `(Intercept)`)) %>% 
+  left_join(select(data, user_id, condition, conservatismFactor), by = "user_id") %>% distinct()
+
+do.call(rbind.data.frame, ranef(m.1)) %>%
+  rownames_to_column() %>%
+  mutate(user_id = factor(str_remove(rowname, "user_id."))) %>%
+  left_join(select(data, user_id, condition, conservatismFactor), by = "user_id") %>% distinct() %>% 
+ggplot(aes(risk, fill = factor(conservatismFactor))) + geom_histogram(bins = 20, color  = "black") + theme_minimal() + geom_vline(xintercept = 0, linetype = "dashed")+ facet_wrap(~conservatismFactor)
+
+tes <- do.call(rbind.data.frame, ranef(m.1)) %>%
+  rownames_to_column() %>%
+  mutate(user_id = factor(str_remove(rowname, "user_id."))) %>%
+  left_join(select(data, user_id, condition, conservatismFactor), by = "user_id") %>% distinct()
+```
+
+##  Results

@@ -1,0 +1,694 @@
+---
+title: "STDDM Regression"
+output: html_notebook
+---
+
+This script will relate the DDM parameters for each subject with their ideological variables.
+
+# Libraries
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(data.table)
+```
+
+
+# Import Data
+
+```{r}
+# Load and prepare data
+behavior_path <- "C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/data/FINAL_RT_EXCLUDED_DATA_20241014.RData"
+load(behavior_path)
+
+# Data preprocessing
+risk_data <- risk_data %>%
+  mutate(
+    rt = rt / 1000, # Convert reaction time to seconds
+    response = ifelse(experimental_treatment_selected == "Yes to treatment", 1, 0),
+    RT = if_else(response == 0, -rt, rt), # Negative RT for 'No' responses
+    risk = risk * 0.01, # Convert percentages to proportions
+    gain = gain * 0.01,
+    no_effect = no_effect * 0.01,
+    idxP = as.numeric(as.factor(user_id)) # Create numeric subject index
+  ) 
+
+ddm_path <- "C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM/NeuroethicsPosteriorAndPredictions.RData"
+load(ddm_path)
+```
+
+## Clean DDM Data
+
+```{r}
+# Extract DDM Metrics
+library(dplyr)
+library(stringr)
+
+# Step 1: Identify columns with square brackets in m1_posterior
+# Extract columns that match the pattern with ".p[XX]" or just "[XX]"
+selected_columns <- m1_posterior %>%
+  select(matches("\\[\\d+\\]$"))
+
+# Step 2: Calculate the averages for each column
+averages <- selected_columns %>%
+  summarise(across(everything(), mean, na.rm = TRUE))
+
+# Step 3: Extract both metric_name and participant_id, handling both ".p[XX]" and "[XX]"
+column_info <- tibble(
+  full_colname = colnames(averages),
+  participant_id = str_extract(colnames(averages), "(?<=\\[)\\d+(?=\\])"),  # Extract participant ID if present in square brackets
+  metric_name = str_replace(colnames(averages), "\\.?p?\\[\\d+\\]$", "")  # Remove either ".p[XX]" or "[XX]"
+)
+
+# Pivot the data into wide format where each metric_name becomes a separate column
+averages_wide <- averages %>%
+  pivot_longer(cols = everything(), names_to = "full_colname", values_to = "average") %>%
+  left_join(column_info, by = "full_colname") %>%
+  mutate(participant_id = as.numeric(participant_id)) %>%
+  select(participant_id, metric_name, average) %>%
+  pivot_wider(names_from = metric_name, values_from = average)  # Pivot into wide format
+```
+
+## Extract Demographic Data
+
+```{r}
+clean_data_summary <- risk_data %>%
+  group_by(user_id) %>%
+  summarise(
+    idxP = first(idxP),
+    condition = first(condition),
+    sex = first(sex),
+    age = first(age),
+    race_ethnicity = first(race_ethnicity),
+    education = first(education),
+    AttendChurch = first(AttendChurch),
+    Religiosity = first(Religiosity),
+    Spirituality = first(Spirituality),
+    ReligiousActivity = first(ReligiousActivity),
+    meditation = first(meditation),
+    Political_Party = first(Political_Party),
+    republican = first(republican),
+    democrat = first(democrat),
+    HumanMind = first(HumanMind),
+    conservative = first(conservative),
+    liberal = first(liberal),
+    Extraversion = first(Extraversion),
+    Agreeableness = first(Agreeableness),
+    Conscientiousness = first(Conscientiousness),
+    Neuroticism = first(Neuroticism),
+    Openness = first(Openness),
+    Harm = first(Harm),
+    Fairness = first(Fairness),
+    Loyalty = first(Loyalty),
+    Athority = first(Athority),
+    Sancticy = first(Sancticy),
+    PerspectiveTaking = first(PerspectiveTaking),
+    Fantasy = first(Fantasy),
+    EmpathicConcern = first(EmpathicConcern),
+    PersonalDistress = first(PersonalDistress),
+    moral.commitment = first(moral.commitment),
+    consequentalism = first(consequentialism.score),
+    GRIPS = first(GRiPs_Score),
+    BerlinScore = first(BerlinScore)
+  )
+
+clean_data_summary$politics = clean_data_summary$republican + clean_data_summary$conservative - clean_data_summary$democrat - clean_data_summary$liberal
+```
+
+## Extract Religiosity Score
+
+```{r}
+library(psych)
+religiousMatrix <- data.matrix(clean_data_summary[,c("Religiosity", "Spirituality", "AttendChurch", "ReligiousActivity")]) - 1
+
+#Kaiser-Meyer-Olkin factor adequacy
+KMO <- psych::KMO(religiousMatrix)
+KMO
+KMO$ImCov
+
+#	Bartlett's Test of Sphericity
+REdaS::bart_spher(religiousMatrix)
+
+scree <- psych::polychoric(religiousMatrix)$rho
+evals <- eigen(scree)$values
+print(scree, cutoff = "0.3")
+scree(scree, factors = F)
+
+#religiousMatrix <- psych::polychoric(religiousMatrix)
+EFA <- fa(religiousMatrix, nfactors = 1, rotate = "oblimin", fm ="ml")
+print(EFA$loadings, cutoff = "0.4")
+#round(EFA$Phi, 3)
+(evals/sum(evals)*100)[1:4]
+EFA$communalities
+
+religiousMatrix.efa <- fa(religiousMatrix, nfactors = 1, rotate = "oblimin", fm ="ml", cor = "poly", scores = "regression")
+print(religiousMatrix.efa)
+fa.diagram(religiousMatrix.efa)
+
+print(religiousMatrix.efa$loadings, cutoff = "0.3")
+clean_data_summary$ReligiousFactor <- religiousMatrix.efa$scores
+# data.religious$ReligiousFactor<- religious.efa$scores
+```
+
+
+## Combine Both Tables
+
+```{r}
+final_table <- left_join(clean_data_summary, averages_wide, by = c("idxP" = "participant_id"))
+# Rename the column 'Sancticy' to 'Sanctity'
+final_table <- final_table %>%
+  rename(Sanctity = Sancticy, Authority = Athority)
+```
+
+## Attach Subscores
+
+```{r}
+raw_behavior_path <- "C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/data/raw_mturk_data/raw.csv"
+raw_data <- read_csv(raw_behavior_path)
+
+# Select MFSQ, GRiPS, and Berlin columns
+selected_columns <- raw_data %>%
+  select(user_id, starts_with("MFSQ"), starts_with("GRiPS"), starts_with("Berlin"))
+
+# Collapse across user_id and take the first value for each column
+collapsed_data <- selected_columns %>%
+  group_by(user_id) %>%
+  summarise(across(everything(), first, na.rm = TRUE))
+
+# Perform an inner join to keep only rows with user_id that exist in both datasets
+final_table <- final_table %>%
+  inner_join(collapsed_data, by = "user_id")
+save(final_table, file='final_ddm_ideological_combined.RData')
+```
+
+
+# Ridge Regression
+
+```{r}
+# Load necessary libraries
+library(glmnet)
+library(data.table)
+
+# Define dependent and independent variables
+dependent_vars <- c("time", "b_gain", "b_risk", "alpha", "theta", "bias")
+independent_formula <- as.formula(paste("~", paste(c("condition", "GRIPS", "consequentalism", "politics", 
+                                                    "Harm", "Fairness", "Loyalty", "Authority", "Sanctity", 
+                                                    "sex", "poly(age, 2, raw=TRUE)", "BerlinScore", "ReligiousFactor"), 
+                                                 collapse = " + ")))
+
+# Ensure final_table is a data.table
+setDT(final_table)
+# Relevel the 'condition' factor with "Motor Function" as the baseline
+final_table[, condition := relevel(factor(condition), ref = "Motor Function")]
+
+# Prepare the design matrix for independent variables using the formula
+data_matrix <- model.matrix(independent_formula, data = final_table)[, -1]  # Drop intercept column
+
+# Function to run ridge regression with cross-validation
+run_ridge_cv <- function(dep_var) {
+  y <- final_table[[dep_var]]
+  
+  # Perform cross-validated ridge regression
+  cv_fit <- cv.glmnet(data_matrix, y, alpha = 0)  # alpha = 0 for ridge
+  
+  # Best lambda based on cross-validation
+  best_lambda <- cv_fit$lambda.min
+  
+  # Final model using the best lambda
+  ridge_model <- glmnet(data_matrix, y, alpha = 0, lambda = best_lambda)
+  
+  # Return results
+  list(dep_var = dep_var, model = ridge_model, best_lambda = best_lambda, cv_fit = cv_fit)
+}
+
+# Run ridge regression for each dependent variable and store results
+results <- lapply(dependent_vars, run_ridge_cv)
+
+# Access results for each model
+for (result in results) {
+  cat("Dependent Variable:", result$dep_var, "\n")
+  cat("Best Lambda:", result$best_lambda, "\n")
+  print(coef(result$model))
+  cat("\n")
+}
+```
+
+
+
+# Summary Statistics
+
+# NEW Regression Analysis
+
+This new regression analysis runs many different regressions in a loop so that all coefficients
+and p-values can be extracted efficiently.
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+
+# Define dependent and independent variables
+dependent_vars <- c("time", "b_gain", "b_risk", "alpha", "theta", "bias")
+independent_vars <- c("condition", "GRIPS", "consequentalism", "politics", 
+                      "Harm", "Fairness", "Loyalty", "Authority", "Sanctity", 
+                      "sex", "poly(age, 2, raw=TRUE)", "BerlinScore", "ReligiousFactor")
+
+# Initialize an empty data frame to store the results
+results <- data.frame(Independent_Var = character(), 
+                      Dependent_Var = character(),
+                      Beta = numeric(), 
+                      P_Value = numeric(), 
+                      stringsAsFactors = FALSE)
+
+# Loop through each dependent variable
+for(dep_var in dependent_vars) {
+  # Loop through each independent variable
+  for(ind_var in independent_vars) {
+    # Create the formula
+    formula <- as.formula(paste(dep_var, "~", ind_var))
+    
+    # Run the linear regression
+    model <- lm(formula, data = final_table)
+    
+    # Extract the beta coefficient and p-value (ignoring intercept)
+    summary_model <- summary(model)
+    coef_data <- summary_model$coefficients
+    
+    # Check if independent variable has multiple levels (for factors)
+    ind_var_rows <- grep(ind_var, rownames(coef_data))
+    
+    # Extract beta coefficient(s) and p-value(s) for the independent variable
+    for(i in ind_var_rows) {
+      beta <- coef_data[i, "Estimate"]
+      p_value <- coef_data[i, "Pr(>|t|)"]
+      t_value <- coef_data[i, "t value"]
+      
+      # Store the results in the results data frame
+      results <- rbind(results, data.frame(
+        Independent_Var = rownames(coef_data)[i],
+        Dependent_Var = dep_var,
+        Beta = beta,
+        P_Value = p_value,
+        T_Value = t_value
+      ))
+    }
+  }
+}
+
+# Print or inspect the results
+print(results)
+```
+
+```{r}
+save(results, file='final_ddm_regression_results.RData')
+```
+
+
+## Regresson for subscores
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+
+# Define dependent and independent variables
+dependent_vars <- c("time", "b_gain", "b_risk", "alpha", "theta", "bias")
+independent_vars <- c("MFSQ1", "MFSQ2", "MFSQ3", "MFSQ4", "MFSQ5", "MFSQ6", "MFSQ7", "MFSQ8", "MFSQ9", "MFSQ10", "MFSQ11", "MFSQ12", "MFSQ13", "MFSQ14", "MFSQ15", "MFSQ16", "MFSQ17", "MFSQ18", "MFSQ19", "MFSQ20", "MFSQ21", "MFSQ22", "MFSQ23", "MFSQ24", "MFSQ25", "MFSQ26", "MFSQ27", "MFSQ28", "MFSQ29", "MFSQ30", "MFSQ31", "MFSQ32", "GRiPS_1", "GRiPS_2", "GRiPS_3", "GRiPS_4", "GRiPS_5", "GRiPS_6", "GRiPS_7", "GRiPS_8", "Berlin1", "Berlin2", "Berlin3", "Berlin4"  )
+
+# Initialize an empty data frame to store the results
+subscore_results <- data.frame(Independent_Var = character(), 
+                      Dependent_Var = character(),
+                      Beta = numeric(), 
+                      P_Value = numeric(), 
+                      stringsAsFactors = FALSE)
+
+# Loop through each dependent variable
+for(dep_var in dependent_vars) {
+  # Loop through each independent variable
+  for(ind_var in independent_vars) {
+    # Create the formula
+    formula <- as.formula(paste(dep_var, "~", ind_var))
+    
+    # Run the linear regression
+    model <- lm(formula, data = final_table)
+    
+    # Extract the beta coefficient and p-value (ignoring intercept)
+    summary_model <- summary(model)
+    coef_data <- summary_model$coefficients
+    
+    # Check if independent variable has multiple levels (for factors)
+    ind_var_rows <- grep(ind_var, rownames(coef_data))
+    
+    # Extract beta coefficient(s) and p-value(s) for the independent variable
+    for(i in ind_var_rows) {
+      beta <- coef_data[i, "Estimate"]
+      p_value <- coef_data[i, "Pr(>|t|)"]
+      t_value <- coef_data[i, "t value"]
+      
+      # Store the results in the subscore_results data frame
+      subscore_results <- rbind(subscore_results, data.frame(
+        Independent_Var = rownames(coef_data)[i],
+        Dependent_Var = dep_var,
+        Beta = beta,
+        P_Value = p_value,
+        T_Value = t_value
+      ))
+    }
+  }
+}
+
+# Print or inspect the results
+print(subscore_results)
+```
+
+## Correlating Metrics to Each Other
+
+```{r}
+library(corrplot)
+
+# Select the relevant columns from final_table
+selected_data <- final_table %>%
+  select(all_of(independent_vars))
+
+# Compute the correlation matrix
+cor_matrix <- cor(selected_data, use = "complete.obs")
+
+# Display the correlation heatmap
+corrplot(cor_matrix, method = "color", type = "lower", 
+         tl.col = "black", tl.srt = 45, 
+         col = colorRampPalette(c("blue", "white", "red"))(200),
+         title = "Correlation Heatmap")
+```
+
+
+# OLD Regression Analysis
+
+## 'alpha' parameter (boundary)
+
+### Condition
+
+```{r}
+# final_table$condition <- relevel(final_table$condition, "Motor Function")
+model = lm(alpha ~ condition, data=final_table)
+summary(model)
+```
+
+### GRIPS
+
+```{r}
+model = lm(alpha ~ GRIPS, data=final_table)
+summary(model)
+```
+
+### Consequentialism
+
+```{r}
+model = lm(alpha ~ consequentalism, data=final_table)
+summary(model)
+```
+
+### Politics
+
+```{r}
+model = lm(alpha ~ politics, data=final_table)
+summary(model)
+```
+
+### Religion
+
+### Moral Intuitions
+
+```{r}
+model = lm(alpha ~ Harm, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(alpha ~ Fairness, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(alpha ~ Loyalty, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(alpha ~ Athority, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(alpha ~ Sancticy, data=final_table)
+summary(model)
+```
+
+## 'bias' parameter (boundary)
+
+### Consequentialism
+
+```{r}
+model = lm(bias ~ consequentalism, data=final_table)
+summary(model)
+```
+
+### Condition
+
+```{r}
+final_table$condition <- relevel(final_table$condition, "Motor Function")
+model = lm(bias ~ condition, data=final_table)
+summary(model)
+```
+
+
+### Politics
+
+```{r}
+model = lm(bias ~ politics, data=final_table)
+summary(model)
+```
+
+### Religion
+
+### Moral Intuitions
+
+```{r}
+model = lm(bias ~ Harm, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(bias ~ Fairness, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(bias ~ Loyalty, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(bias ~ Athority, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(bias ~ Sancticy, data=final_table)
+summary(model)
+```
+
+
+
+## 'b1' parameter (gain drift rate)
+
+### GRIPS
+
+```{r}
+model = lm(b_gain ~ GRIPS, data=final_table)
+summary(model)
+```
+
+### Politics
+
+```{r}
+model = lm(b_gain ~ politics, data=final_table)
+summary(model)
+```
+
+### Religion
+
+### Moral Intuitions
+
+```{r}
+model = lm(b_gain ~ Harm, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(b_gain ~ Fairness, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(b_gain ~ Loyalty, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(b_gain ~ Athority, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(b_gain ~ Sancticy, data=final_table)
+summary(model)
+```
+
+## 'b2' parameter (risk drift rate)
+
+### GRIPS
+
+```{r}
+model = lm(b_risk ~ GRIPS, data=final_table)
+summary(model)
+```
+
+### age
+
+```{r}
+model = lm(b_risk ~ poly(age, 2), data=final_table)
+summary(model)
+```
+### SEX
+
+```{r}
+model = lm(b_risk ~ sex, data=final_table)
+summary(model)
+
+aov_output = aov(b_risk ~ sex, data=final_table)
+summary(aov_output)
+
+TukeyHSD(aov_output)
+```
+
+### Politics
+
+```{r}
+model = lm(b_risk ~ politics, data=final_table)
+summary(model)
+```
+
+### Religion
+
+### Moral Intuitions
+
+```{r}
+model = lm(b_risk ~ Harm, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(b_risk ~ Fairness, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(b_risk ~ Loyalty, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(b_risk ~ Athority, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(b_risk ~ Sancticy, data=final_table)
+summary(model)
+```
+
+## 'time' parameter (risk drift rate)
+
+```{r}
+final_table$condition <- relevel(final_table$condition, "Motor Function")
+model = lm(time ~ condition, data=final_table)
+summary(model)
+
+aov_output = aov(time ~ condition, data=final_table)
+summary(aov_output)
+
+TukeyHSD(aov_output)
+```
+
+### sex
+
+```{r}
+model = lm(time ~ sex, data=final_table)
+summary(model)
+```
+
+### age
+
+```{r}
+model = lm(time ~ poly(age, 2), data=final_table)
+summary(model)
+```
+
+### GRIPS
+
+Positive time parameter means risk comes first.
+Negative time parameter means benefit comes first.
+
+Interpretation: Higher GRIPS -> benefit calculation happens first
+
+```{r}
+model = lm(time ~ GRIPS, data=final_table)
+summary(model)
+```
+
+### Consequentialism
+
+```{r}
+model = lm(time ~ consequentalism, data=final_table)
+summary(model)
+```
+
+### Politics
+
+```{r}
+model = lm(time ~ politics, data=final_table)
+summary(model)
+```
+
+### Religion
+
+### Moral Intuitions
+
+```{r}
+model = lm(time ~ Harm + Fairness + Loyalty + Athority + Sancticy, data=final_table)
+summary(model)
+```
+
+
+```{r}
+model = lm(time ~ Harm, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(time ~ Fairness, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(time ~ Loyalty, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(time ~ Athority, data=final_table)
+summary(model)
+```
+
+```{r}
+model = lm(time ~ Sancticy, data=final_table)
+summary(model)
+```

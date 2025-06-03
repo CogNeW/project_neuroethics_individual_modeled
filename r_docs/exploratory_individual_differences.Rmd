@@ -1,0 +1,876 @@
+---
+title: "action items"
+author: "Kianté Fernandez"
+date: "9/26/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load library, include=FALSE}
+library(psych)
+library(car)
+library(knitr)
+library(broom)
+
+# needed libraries
+library(pairwiseComparisons) #https://indrajeetpatil.github.io/pairwiseComparisons/
+library(ggsignif)
+library(kableExtra)
+
+library(scales)
+
+library(reshape2)
+library(tidyverse)
+```
+
+```{r load data, include=FALSE}
+
+load("~/Dropbox/Medaglia_RiskBenefit_Neuroethics/Pilot_Data/Study1_Project/RiskBenefit_Neuroethics/data/Cleaned_Pilot/clean.data.2020.09.27.RData")
+# Disable scientific notation
+options(scipen=999)
+
+
+Neuroethics_Judgement %>% 
+   dplyr::select("user_id", "condition", "Risk_Beta", "Gain_Beta", "Interaction", 
+"Risk_sig", "Gain_sig", "Interaction_sig", "vif.risk", "vif.gain", 
+"vif.interaction", "marginal.effect.risk", "marginal.effect.gain", 
+"marginal.effect.interaction", "No", "Yes", 
+"Extraversion", "Agreeableness", "Conscientiousness", "Neuroticism", 
+"Openness", "Harm", "Fairness", "Loyalty", "Athority", "Sancticy", 
+"PerspectiveTaking", "Fantasy", "EmpathicConcern", "PersonalDistress", 
+"POWER", "SELF.DIRECTION", "ACHIEVEMENT", "HEDONISM", "STIMULATION", 
+"UNIVERSALISM", "BENEVOLENCE", "TRADITION", "CONFORMITY", "SECURITY", 
+"Lying", "Assasination", "Torture", "Murder", "Stealing", "ForcedSterilization", 
+"consequentialism.score", "moral.commitment", "SNS.total", "SNS.ability", 
+"SNS.preference", "Berlin1", "Berlin2", "Berlin3", "Berlin4", 
+"BerlinScore", "GRiPs_Score", "republican", "democrat", "independent", 
+"conservative", "liberal", "conservatismFactor", "sex", "age", 
+"race_ethnicity", "education", "ReligionRaised", "ReligionNow", 
+"Religiosity", "Spirituality", "AttendChurch", "ReligiousActivity", 
+"meditation", "RelationshipStatus", "Income", "YearOfEducation", "Political_Party", "Optimize"
+) %>% 
+   mutate(lambda = -Risk_Beta/Gain_Beta) %>%
+   mutate(Risk_odds = exp(Risk_Beta)) %>%
+   mutate(Gain_odds = exp(Gain_Beta)) %>%
+   mutate(dominate = ifelse(Yes >= 75 *.80 | No >= 75 *.80, "dominate", "not_dominate")) %>% 
+   mutate(loss_aversion = as.factor(ifelse(lambda > 1, "loss_aversion", "Not_loss_aversion"))) %>% 
+   mutate(risk_aversion = as.factor(ifelse(Risk_odds > 1, "risk_seeking", "risk_aversion"))) %>% 
+   distinct() -> data.h
+```
+
+
+```{r values, echo=FALSE}
+data.h %>% 
+  dplyr::select(user_id, condition, marginal.effect.risk, marginal.effect.gain, "POWER", "SELF.DIRECTION", 
+"ACHIEVEMENT", "HEDONISM", "STIMULATION", "UNIVERSALISM", "BENEVOLENCE", 
+"TRADITION", "CONFORMITY", "SECURITY", Yes, No) -> data.values
+data.values$condition <- relevel(data.values$condition, "Mood")
+
+#note you need to run the controls for Yes's still
+
+#risk 
+lm.power.risk <- lm(marginal.effect.risk ~POWER, data.values)
+lm.self.direction.risk <- lm(marginal.effect.risk ~SELF.DIRECTION, data.values)
+lm.achievement.risk <- lm(marginal.effect.risk ~ACHIEVEMENT, data.values)
+lm.hedonism.risk <- lm(marginal.effect.risk ~HEDONISM, data.values)
+lm.stimulation.risk <- lm(marginal.effect.risk ~STIMULATION, data.values)
+lm.universalism.risk <- lm(marginal.effect.risk ~UNIVERSALISM, data.values)
+lm.benevolence.risk <- lm(marginal.effect.risk ~BENEVOLENCE, data.values)
+lm.tradition.risk <- lm(marginal.effect.risk ~TRADITION, data.values)
+lm.conformity.risk <- lm(marginal.effect.risk ~CONFORMITY, data.values)
+lm.security.risk <- lm(marginal.effect.risk ~SECURITY, data.values)
+
+tab <- map_df(list(lm.power.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Continuous POWER")%>%  
+  kable_styling(latex_options = "hold_position")
+
+tab <- map_df(list(lm.self.direction.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Continuous SELF.DIRECTION")%>%  
+  kable_styling(latex_options = "hold_position")
+
+tab <- map_df(list(lm.achievement.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Continuous achievement")%>%  
+  kable_styling(latex_options = "hold_position")
+
+tab <- map_df(list(lm.hedonism.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Continuous hedonism")%>%  
+  kable_styling(latex_options = "hold_position")
+
+tab <- map_df(list(lm.stimulation.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Continuous stimulation")%>%  
+  kable_styling(latex_options = "hold_position")
+
+tab <- map_df(list(lm.universalism.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Continuous universalism")%>%  
+  kable_styling(latex_options = "hold_position")
+
+tab <- map_df(list(lm.benevolence.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Continuous benevolence")%>%  
+  kable_styling(latex_options = "hold_position")
+
+tab <- map_df(list(lm.tradition.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Continuous tradition")%>%  
+  kable_styling(latex_options = "hold_position")
+
+tab <- map_df(list(lm.conformity.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Continuous conformity")%>%  
+  kable_styling(latex_options = "hold_position")
+
+tab <- map_df(list(lm.security.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Continuous security")%>%  
+  kable_styling(latex_options = "hold_position")
+
+ggplot(data.values, aes(x=POWER, y=marginal.effect.risk)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point() + 
+    labs(x = "POWER", 
+       y = "Risk", 
+       title  = "Risk by POWER")
+
+ggplot(data.values, aes(x=SELF.DIRECTION, y=marginal.effect.risk)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point() + 
+    labs(x = "SELF.DIRECTION", 
+       y = "Risk", 
+       title  = "Risk by SELF.DIRECTION")
+
+ggplot(data.values, aes(x=ACHIEVEMENT, y=marginal.effect.risk)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point() + 
+    labs(x = "ACHIEVEMENT", 
+       y = "Risk", 
+       title  = "Risk by ACHIEVEMENT")
+
+ggplot(data.values, aes(x=HEDONISM, y=marginal.effect.risk)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point() + 
+    labs(x = "HEDONISM", 
+       y = "Risk", 
+       title  = "Risk by HEDONISM")
+
+ggplot(data.values, aes(x=STIMULATION, y=marginal.effect.risk)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point() + 
+    labs(x = "STIMULATION", 
+       y = "Risk", 
+       title  = "Risk by STIMULATION")
+
+ggplot(data.values, aes(x=UNIVERSALISM, y=marginal.effect.risk)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point() + 
+    labs(x = "UNIVERSALISM", 
+       y = "Risk", 
+       title  = "Risk by UNIVERSALISM")
+
+ggplot(data.values, aes(x=BENEVOLENCE, y=marginal.effect.risk)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point() + 
+    labs(x = "BENEVOLENCE", 
+       y = "Risk", 
+       title  = "Risk by BENEVOLENCE")
+
+ggplot(data.values, aes(x=TRADITION, y=marginal.effect.risk)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point() + 
+    labs(x = "TRADITION", 
+       y = "Risk", 
+       title  = "Risk by TRADITION")
+
+ggplot(data.values, aes(x=CONFORMITY, y=marginal.effect.risk)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point() + 
+    labs(x = "CONFORMITY", 
+       y = "Risk", 
+       title  = "Risk by CONFORMITY")
+
+ggplot(data.values, aes(x=SECURITY, y=marginal.effect.risk)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point() + 
+    labs(x = "SECURITY", 
+       y = "Risk", 
+       title  = "Risk by SECURITY")
+
+data.values %>% 
+  dplyr::select(user_id, POWER, SELF.DIRECTION, ACHIEVEMENT, HEDONISM, STIMULATION, UNIVERSALISM, BENEVOLENCE, TRADITION, CONFORMITY, SECURITY) %>% 
+  reshape2::melt(id = "user_id" , variable.name = "value", value.name = "likert") -> plotdata
+
+plotdata <- merge(data.values[,c("user_id", "marginal.effect.risk")], plotdata, "user_id")
+
+values <- plotdata %>%
+  group_by(value, likert) %>%
+  summarize(n = n(),
+         mean = mean(marginal.effect.risk),
+         sd = sd(marginal.effect.risk),
+         se = sd / sqrt(n),
+         ci = qt(0.975, df = n - 1) * sd / sqrt(n)) %>% na.omit()
+
+knitr::kable(values, caption = "Descriptives for risk by value")%>%  
+  kable_styling(latex_options = "hold_position")
+# plot the means and standard errors
+pd <- position_dodge(0.2)
+ggplot(values, 
+       aes(x = likert,
+           y = mean, 
+           group=value, 
+           color=value)) +
+   geom_point(position=pd, 
+             size = 3) +
+  geom_line(position = pd, 
+            size = 1) +
+  geom_errorbar(aes(ymin = mean - se, 
+                    ymax = mean + se), 
+                width = .1, 
+                position = pd, 
+                size = 1) +
+  theme_minimal() +
+  labs(title = "Mean risk AME by value",
+       subtitle = "(mean +/- standard error)",
+       x = "", 
+       y = "",
+       color = "Attribute")+
+  facet_wrap(~ value)+
+  theme(legend.position="none")+
+  geom_hline(yintercept = 0, linetype="dashed", size=.5)
+
+
+
+#gain
+lm.power.gain <- lm(marginal.effect.gain ~POWER, data.values)
+lm.self.direction.gain<- lm(marginal.effect.gain ~SELF.DIRECTION, data.values)
+lm.achievement.gain <- lm(marginal.effect.gain ~ACHIEVEMENT, data.values)
+lm.hedonism.gain <- lm(marginal.effect.gain ~HEDONISM, data.values)
+lm.stimulation.gain <- lm(marginal.effect.gain ~STIMULATION, data.values)
+lm.universalism.gain <- lm(marginal.effect.gain ~UNIVERSALISM, data.values)
+lm.benevolence.gain <- lm(marginal.effect.gain ~BENEVOLENCE, data.values)
+lm.tradition.gain <- lm(marginal.effect.gain ~TRADITION, data.values)
+lm.conformity.gain <- lm(marginal.effect.gain ~CONFORMITY, data.values)
+lm.security.gain <- lm(marginal.effect.gain ~SECURITY, data.values)
+
+tab <- map_df(list(lm.power.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting gain given Continuous POWER")%>%  
+  kable_styling(latex_options = "hold_position")
+
+tab <- map_df(list(lm.self.direction.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting gain given Continuous SELF.DIRECTION")%>%  
+  kable_styling(latex_options = "hold_position")
+
+tab <- map_df(list(lm.achievement.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting gain given Continuous achievement")%>%  
+  kable_styling(latex_options = "hold_position")
+
+tab <- map_df(list(lm.hedonism.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting gain given Continuous hedonism")%>%  
+  kable_styling(latex_options = "hold_position")
+
+tab <- map_df(list(lm.stimulation.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting gain given Continuous stimulation")%>%  
+  kable_styling(latex_options = "hold_position")
+
+tab <- map_df(list(lm.universalism.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting gain given Continuous universalism")%>%  
+  kable_styling(latex_options = "hold_position")
+
+tab <- map_df(list(lm.benevolence.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting gain given Continuous benevolence")%>%  
+  kable_styling(latex_options = "hold_position")
+
+tab <- map_df(list(lm.tradition.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting gain given Continuous tradition")%>%  
+  kable_styling(latex_options = "hold_position")
+
+tab <- map_df(list(lm.conformity.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting gain given Continuous conformity")%>%  
+  kable_styling(latex_options = "hold_position")
+
+tab <- map_df(list(lm.security.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting gain given Continuous security")%>%  
+  kable_styling(latex_options = "hold_position")
+
+ggplot(data.values, aes(x=POWER, y=marginal.effect.gain)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point() + 
+    labs(x = "POWER", 
+       y = "gain", 
+       title  = "gain by POWER")
+
+ggplot(data.values, aes(x=SELF.DIRECTION, y=marginal.effect.gain)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point() + 
+    labs(x = "SELF.DIRECTION", 
+       y = "gain", 
+       title  = "gain by SELF.DIRECTION")
+
+ggplot(data.values, aes(x=ACHIEVEMENT, y=marginal.effect.gain)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point() + 
+    labs(x = "ACHIEVEMENT", 
+       y = "gain", 
+       title  = "gain by ACHIEVEMENT")
+
+ggplot(data.values, aes(x=HEDONISM, y=marginal.effect.gain)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point() + 
+    labs(x = "HEDONISM", 
+       y = "gain", 
+       title  = "gain by HEDONISM")
+
+ggplot(data.values, aes(x=STIMULATION, y=marginal.effect.gain)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point() + 
+    labs(x = "STIMULATION", 
+       y = "gain", 
+       title  = "gain by STIMULATION")
+
+ggplot(data.values, aes(x=UNIVERSALISM, y=marginal.effect.gain)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point() + 
+    labs(x = "UNIVERSALISM", 
+       y = "gain", 
+       title  = "gain by UNIVERSALISM")
+
+ggplot(data.values, aes(x=BENEVOLENCE, y=marginal.effect.gain)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point() + 
+    labs(x = "BENEVOLENCE", 
+       y = "gain", 
+       title  = "gain by BENEVOLENCE")
+
+ggplot(data.values, aes(x=TRADITION, y=marginal.effect.gain)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point() + 
+    labs(x = "TRADITION", 
+       y = "gain", 
+       title  = "gain by TRADITION")
+
+ggplot(data.values, aes(x=CONFORMITY, y=marginal.effect.gain)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point() + 
+    labs(x = "CONFORMITY", 
+       y = "gain", 
+       title  = "gain by CONFORMITY")
+
+ggplot(data.values, aes(x=SECURITY, y=marginal.effect.gain)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point() + 
+    labs(x = "SECURITY", 
+       y = "gain", 
+       title  = "gain by SECURITY")
+
+data.values %>% 
+  dplyr::select(user_id, POWER, SELF.DIRECTION, ACHIEVEMENT, HEDONISM, STIMULATION, UNIVERSALISM, BENEVOLENCE, TRADITION, CONFORMITY, SECURITY) %>% 
+  reshape2::melt(id = "user_id" , variable.name = "value", value.name = "likert") -> plotdata
+
+plotdata <- merge(data.values[,c("user_id", "marginal.effect.gain")], plotdata, "user_id")
+
+values <- plotdata %>%
+  group_by(value, likert) %>%
+  summarize(n = n(),
+         mean = mean(marginal.effect.gain),
+         sd = sd(marginal.effect.gain),
+         se = sd / sqrt(n),
+         ci = qt(0.975, df = n - 1) * sd / sqrt(n)) %>% na.omit()
+
+knitr::kable(values, caption = "Descriptives for gain by value")%>%  
+  kable_styling(latex_options = "hold_position")
+# plot the means and standard errors
+pd <- position_dodge(0.2)
+ggplot(values, 
+       aes(x = likert,
+           y = mean, 
+           group=value, 
+           color=value)) +
+   geom_point(position=pd, 
+             size = 3) +
+  geom_line(position = pd, 
+            size = 1) +
+  geom_errorbar(aes(ymin = mean - se, 
+                    ymax = mean + se), 
+                width = .1, 
+                position = pd, 
+                size = 1) +
+  theme_minimal() +
+  labs(title = "Mean gain AME by value",
+       subtitle = "(mean +/- standard error)",
+       x = "", 
+       y = "",
+       color = "Attribute")+
+  facet_wrap(~ value)+
+  theme(legend.position="none")+
+  geom_hline(yintercept = 0, linetype="dashed", size=.5)
+```
+
+**risk can be predicted by self direction, tradition, conformity, security**
+
+**gain can be predicted by henonism**
+
+
+```{r lombrozo, echo=FALSE}
+data.h %>% 
+  dplyr::select(user_id, marginal.effect.risk, marginal.effect.gain, "Lying", "Assasination", 
+"Torture", "Murder", "Stealing", "ForcedSterilization", "consequentialism.score", 
+"moral.commitment", Yes, No) -> data.commitment
+
+data.commitment$moral.commitment <- relevel(data.commitment$moral.commitment, "Deontological")
+
+#risk 
+lm.commitment.risk <- lm(marginal.effect.risk ~consequentialism.score, data.commitment)
+
+tab <- map_df(list(lm.commitment.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Continuous consequentialism")%>%  
+  kable_styling(latex_options = "hold_position")
+
+lm.commitment.risk <- lm(marginal.effect.risk ~moral.commitment, data.commitment)
+
+tab <- map_df(list(lm.commitment.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Categorical moral commitment")%>%  
+  kable_styling(latex_options = "hold_position")
+
+ggplot(data.commitment, aes(x=consequentialism.score, y=marginal.effect.risk)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point() + 
+    labs(x = "consequentialism.score", 
+       y = "Risk", 
+       title  = "Risk by consequentialism.score")
+
+moral <- data.commitment %>%
+  group_by(moral.commitment) %>%
+  summarize(n = n(),
+         mean = mean(marginal.effect.risk),
+         sd = sd(marginal.effect.risk),
+         se = sd / sqrt(n),
+         ci = qt(0.975, df = n - 1) * sd / sqrt(n)) %>% na.omit()
+knitr::kable(moral, caption = "Descriptives for risk by moral commitment")%>%  
+  kable_styling(latex_options = "hold_position")
+# plot the means and standard errors
+ggplot(moral, 
+       aes(x = moral.commitment, 
+           y = mean, 
+           group = 1)) +
+  geom_point(size = 3) +
+  geom_line() +
+  geom_errorbar(aes(ymin = mean - se, 
+                    ymax = mean + se), 
+                width = .1) +
+   labs(x = "moral.commitment", 
+       y = "Mean", 
+       title  = "Risk by moral commitment")
+
+# creating a basic plot
+p <- ggplot(data.commitment, aes(moral.commitment, marginal.effect.risk, fill = moral.commitment)) +
+  geom_boxplot()
+
+# using `pairwiseComparisons` package to create a dataframe with results
+df <-
+  pairwise_comparisons(data.commitment, moral.commitment, marginal.effect.risk, messages = FALSE, p.adjust.method = "none", var.equal = TRUE) %>%
+  dplyr::mutate(.data = ., groups = purrr::pmap(.l = list(group1, group2), .f = c)) %>%
+  dplyr::arrange(.data = ., group1)
+knitr::kable(df[c("group1", "group2", "p.value", "significance", "test.details")], caption = "Pairwise comparisons for risk by moral.commitment")%>%  
+  kable_styling(latex_options = "hold_position")
+
+p +
+  ggsignif::geom_signif(
+    comparisons = df$groups,
+    map_signif_level = TRUE,
+    tip_length = 0.01,
+    y_position = c(-0.01, .02, .001),
+    annotations = df$label,
+    test = NULL,
+    na.rm = TRUE,
+    parse = TRUE
+  )
+
+#gain
+lm.commitment.gain <- lm(marginal.effect.gain ~consequentialism.score, data.commitment)
+
+tab <- map_df(list(lm.commitment.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting gain given Continuous consequentialism")%>%  
+  kable_styling(latex_options = "hold_position")
+
+lm.commitment.gain <- lm(marginal.effect.gain ~moral.commitment, data.commitment)
+
+tab <- map_df(list(lm.commitment.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting gain given Categorical moral commitment")%>%  
+  kable_styling(latex_options = "hold_position")
+
+ggplot(data.commitment, aes(x=consequentialism.score, y=marginal.effect.gain)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point() + 
+    labs(x = "consequentialism.score", 
+       y = "gain", 
+       title  = "gain by consequentialism.score")
+
+moral <- data.commitment %>%
+  group_by(moral.commitment) %>%
+  summarize(n = n(),
+         mean = mean(marginal.effect.gain),
+         sd = sd(marginal.effect.gain),
+         se = sd / sqrt(n),
+         ci = qt(0.975, df = n - 1) * sd / sqrt(n)) %>% na.omit()
+knitr::kable(moral, caption = "Descriptives for gain by moral commitment")%>%  
+  kable_styling(latex_options = "hold_position")
+# plot the means and standard errors
+ggplot(moral, 
+       aes(x = moral.commitment, 
+           y = mean, 
+           group = 1)) +
+  geom_point(size = 3) +
+  geom_line() +
+  geom_errorbar(aes(ymin = mean - se, 
+                    ymax = mean + se), 
+                width = .1) +
+   labs(x = "moral.commitment", 
+       y = "Mean", 
+       title  = "gain by moral commitment")
+
+# creating a basic plot
+p <- ggplot(data.commitment, aes(moral.commitment, marginal.effect.gain, fill = moral.commitment)) +
+  geom_boxplot()
+
+# using `pairwiseComparisons` package to create a dataframe with results
+df <-
+  pairwise_comparisons(data.commitment, moral.commitment, marginal.effect.gain, messages = FALSE, p.adjust.method = "none", var.equal = TRUE) %>%
+  dplyr::mutate(.data = ., groups = purrr::pmap(.l = list(group1, group2), .f = c)) %>%
+  dplyr::arrange(.data = ., group1)
+knitr::kable(df[c("group1", "group2", "p.value", "significance", "test.details")], caption = "Pairwise comparisons for gain by moral.commitment")%>%  
+  kable_styling(latex_options = "hold_position")
+
+p +
+  ggsignif::geom_signif(
+    comparisons = df$groups,
+    map_signif_level = TRUE,
+    tip_length = 0.01,
+    y_position = c(-0.01, .02, .001),
+    annotations = df$label,
+    test = NULL,
+    na.rm = TRUE,
+    parse = TRUE
+  )
+
+
+###both in one graph
+data.commitment %>% 
+  dplyr::select(moral.commitment, marginal.effect.risk, marginal.effect.gain) %>% 
+  mutate(marginal.effect.risk = -marginal.effect.risk) %>% 
+  reshape2::melt(id = "moral.commitment" , variable.name = "type", value.name = "beta") -> plotdata
+
+political <- plotdata %>%
+  group_by(moral.commitment, type) %>%
+  summarize(n = n(),
+            mean = mean(beta),
+            sd = sd(beta),
+            se = sd/sqrt(n))
+
+pd <- position_dodge(0.2)
+ggplot(political, 
+       aes(x = factor(moral.commitment, 
+                      labels = c("Deontological",
+                                 "Consequentialist")), 
+           y = mean, 
+           group=type, 
+           color=type)) +
+  geom_point(position=pd, 
+             size = 3) +
+  geom_line(position = pd, 
+            size = 1) +
+  geom_errorbar(aes(ymin = mean - se, 
+                    ymax = mean + se), 
+                width = .1, 
+                position = pd, 
+                size = 1) +
+  #scale_y_continuous(label = scales::dollar) +
+  scale_color_brewer(palette="Set1") +
+  theme_minimal() +
+  labs(title = "Mean AME by type and moral commitment",
+       subtitle = "(mean +/- standard error)",
+       x = "", 
+       y = "",
+       color = "Attribute")
+
+#testing the interaction between r/b and moral commitment contoling for the effect of dom responses
+data.commitment %>% 
+  dplyr::select(moral.commitment, marginal.effect.risk, marginal.effect.gain, Yes, No) %>% 
+  mutate(marginal.effect.risk = -marginal.effect.risk) %>% 
+  reshape2::melt(id = c("moral.commitment", "Yes", "No") , variable.name = "type", value.name = "beta") -> test
+
+lm.commitment <- lm(beta~ type*moral.commitment, test)
+
+tab <- map_df(list(lm.commitment), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting AME gien R/B and moral commitment")%>%  
+  kable_styling(latex_options = "hold_position")
+```
+
+*check out the difference between risks and gains for deontological*
+
+```{r big 5, echo=FALSE}
+data.h %>% 
+  dplyr::select(user_id, marginal.effect.risk, marginal.effect.gain, "Extraversion", 
+"Agreeableness", "Conscientiousness", "Neuroticism", "Openness", Yes) -> data.big5
+
+#risk
+lm.extraversion.risk <- lm(marginal.effect.risk ~ Extraversion, data.big5)
+lm.agreeableness.risk <- lm(marginal.effect.risk ~ Agreeableness, data.big5)
+lm.conscientiousness.risk <- lm(marginal.effect.risk ~ Conscientiousness, data.big5)
+lm.neuroticism.risk <- lm(marginal.effect.risk ~ Neuroticism, data.big5)
+lm.openness.risk <- lm(marginal.effect.risk ~ Openness, data.big5)
+
+tab <- map_df(list(lm.extraversion.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Continuous extraversion")%>%  
+  kable_styling(latex_options = "hold_position")
+
+ggplot(data.big5, aes(x=Extraversion, y=marginal.effect.risk)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point()
+
+tab <- map_df(list(lm.agreeableness.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Continuous Agreeableness")%>%  
+  kable_styling(latex_options = "hold_position")
+
+ggplot(data.big5, aes(x=Agreeableness, y=marginal.effect.risk)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point()
+
+tab <- map_df(list(lm.conscientiousness.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Continuous Conscientiousness")%>%  
+  kable_styling(latex_options = "hold_position")
+
+ggplot(data.big5, aes(x=Conscientiousness, y=marginal.effect.risk)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point()
+
+tab <- map_df(list(lm.neuroticism.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Continuous Neuroticism")%>%  
+  kable_styling(latex_options = "hold_position")
+
+ggplot(data.big5, aes(x=Neuroticism, y=marginal.effect.risk)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point()
+
+tab <- map_df(list(lm.openness.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Continuous Openness")%>%  
+  kable_styling(latex_options = "hold_position")
+
+ggplot(data.big5, aes(x=Openness, y=marginal.effect.risk)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point()
+
+#gain
+lm.extraversion.gain <- lm(marginal.effect.gain ~ Extraversion, data.big5)
+lm.agreeableness.gain <- lm(marginal.effect.gain ~ Agreeableness, data.big5)
+lm.conscientiousness.gain <- lm(marginal.effect.gain ~ Conscientiousness, data.big5)
+lm.neuroticism.gain <- lm(marginal.effect.gain ~ Neuroticism, data.big5)
+lm.openness.gain <- lm(marginal.effect.gain ~ Openness, data.big5)
+
+tab <- map_df(list(lm.extraversion.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting gain given Continuous extraversion")%>%  
+  kable_styling(latex_options = "hold_position")
+
+ggplot(data.big5, aes(x=Extraversion, y=marginal.effect.gain)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point()
+
+tab <- map_df(list(lm.agreeableness.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting gain given Continuous Agreeableness")%>%  
+  kable_styling(latex_options = "hold_position")
+
+ggplot(data.big5, aes(x=Agreeableness, y=marginal.effect.gain)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point()
+
+tab <- map_df(list(lm.conscientiousness.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting gain given Continuous Conscientiousness")%>%  
+  kable_styling(latex_options = "hold_position")
+
+ggplot(data.big5, aes(x=Conscientiousness, y=marginal.effect.gain)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point()
+
+tab <- map_df(list(lm.neuroticism.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting gain given Continuous Neuroticism")%>%  
+  kable_styling(latex_options = "hold_position")
+
+ggplot(data.big5, aes(x=Neuroticism, y=marginal.effect.gain)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point()
+
+tab <- map_df(list(lm.openness.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting gain given Continuous Openness")%>%  
+  kable_styling(latex_options = "hold_position")
+
+ggplot(data.big5, aes(x=Openness, y=marginal.effect.gain)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point()
+```
+
+**at first glance, nothing with the big 5**
+
+```{r numeracy, echo=FALSE}
+data.h %>% 
+  dplyr::select(user_id, marginal.effect.risk, marginal.effect.gain, "SNS.total", "SNS.ability", "SNS.preference", "Berlin1", "Berlin2", "Berlin3", "Berlin4", "BerlinScore", Yes, No) -> data.numeracy
+
+#risk
+lm.sns.total.risk <- lm(marginal.effect.risk ~ SNS.total, data.numeracy)
+lm.sns.preference.risk <- lm(marginal.effect.risk ~ SNS.preference, data.numeracy)
+lm.sns.ability.risk <- lm(marginal.effect.risk ~ SNS.ability, data.numeracy)
+
+
+lm.berlin.risk <- lm(marginal.effect.risk ~ BerlinScore, data.numeracy)
+
+lm.numeracy.risk <- lm(marginal.effect.risk ~ SNS.preference + BerlinScore + Yes, data.numeracy)
+
+
+tab <- map_df(list(lm.sns.total.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Continuous SNS.total")%>%  
+  kable_styling(latex_options = "hold_position")
+
+ggplot(data.numeracy, aes(x=SNS.total, y=marginal.effect.risk)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point()
+
+tab <- map_df(list(lm.sns.preference.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Continuous SNS preference")%>%  
+  kable_styling(latex_options = "hold_position")
+
+ggplot(data.numeracy, aes(x=SNS.preference, y=marginal.effect.risk)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point()
+
+tab <- map_df(list(lm.sns.ability.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Continuous SNS.ability")%>%  
+  kable_styling(latex_options = "hold_position")
+
+ggplot(data.numeracy, aes(x=SNS.ability, y=marginal.effect.risk)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point()
+
+tab <- map_df(list(lm.berlin.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Continuous Berlin Score")%>%  
+  kable_styling(latex_options = "hold_position")
+
+ggplot(data.numeracy, aes(x=BerlinScore, y=marginal.effect.risk)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point()
+
+
+
+tab <- map_df(list(lm.numeracy.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given numeracy measures")%>%  
+  kable_styling(latex_options = "hold_position")
+
+#gain
+lm.sns.gain <- lm(marginal.effect.gain ~ SNS.total, data.numeracy)
+lm.sns.preference.gain <- lm(marginal.effect.gain ~ SNS.preference, data.numeracy)
+lm.sns.ability.gain <- lm(marginal.effect.gain ~ SNS.ability, data.numeracy)
+
+lm.berlin.gain <- lm(marginal.effect.gain ~ BerlinScore, data.numeracy)
+
+lm.numeracy.gain <- lm(marginal.effect.gain ~ SNS.preference + BerlinScore + Yes, data.numeracy)
+
+
+tab <- map_df(list(lm.sns.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting gain given Continuous SNS")%>%  
+  kable_styling(latex_options = "hold_position")
+
+ggplot(data.numeracy, aes(x=SNS.total, y=marginal.effect.gain)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point()
+
+tab <- map_df(list(lm.sns.preference.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting gain given Continuous SNS preference")%>%  
+  kable_styling(latex_options = "hold_position")
+
+ggplot(data.numeracy, aes(x=SNS.preference, y=marginal.effect.gain)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point()
+
+tab <- map_df(list(lm.sns.ability.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting gain given Continuous SNS.ability")%>%  
+  kable_styling(latex_options = "hold_position")
+
+ggplot(data.numeracy, aes(x=SNS.ability, y=marginal.effect.gain)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point()
+
+tab <- map_df(list(lm.berlin.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting gain given Continuous Berlin Score")%>%  
+  kable_styling(latex_options = "hold_position")
+
+ggplot(data.numeracy, aes(x=BerlinScore, y=marginal.effect.gain)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point()
+
+tab <- map_df(list(lm.numeracy.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting gain given numeracy measures")%>%  
+  kable_styling(latex_options = "hold_position")
+
+
+#testing the interaction between r/b and Political contoling for the effect of dom responses
+data.numeracy %>% 
+  dplyr::select(marginal.effect.risk, marginal.effect.gain, Yes, No, SNS.preference, BerlinScore) %>% 
+  mutate(marginal.effect.risk = -marginal.effect.risk) %>% 
+  reshape2::melt(id = c("SNS.preference", "Yes","No", "BerlinScore") , variable.name = "type", value.name = "beta") -> test
+
+lm.numeracy <- lm(beta~ type*SNS.preference + BerlinScore*type + No, test)
+
+tab <- map_df(list(lm.numeracy), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting AME given R/B and numeracy")%>%  
+  kable_styling(latex_options = "hold_position")
+```
+
+the subjective numeracy score has subscales, so I tested those too. 
+
+Here we see both numeracy measures can predict risk. Looking even closer, the subjective numeracy scale seems to do a better job
+
+**Adjusted R-squared for predicting risk with objective:  0.04239**
+
+**Adjusted R-squared for predicting risk with subjective subscale:  0.05298**
+
+However, the subjective measure seems to be leveraged by a few points
+
+**If you look at both in a model controling for yes, they each contribute to predicting risk**
+see the table with both measures
+
+```{r eval=FALSE, include=FALSE}
+
+data.h %>% 
+  dplyr::select(user_id, marginal.effect.risk, marginal.effect.gain, "GRiPs_Score", Yes, No) -> data.grips
+
+#risk
+lm.grips.risk <- lm(marginal.effect.risk ~ GRiPs_Score, data.grips)
+
+tab <- map_df(list(lm.grips.risk), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting Risk given Continuous GRiPs")%>%  
+  kable_styling(latex_options = "hold_position")
+
+ggplot(data.grips, aes(x=GRiPs_Score, y=marginal.effect.risk)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point()
+
+
+#gain
+lm.grips.gain <- lm(marginal.effect.gain ~ GRiPs_Score, data.grips)
+
+tab <- map_df(list(lm.grips.gain), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting gain GRiPs measures")%>%  
+  kable_styling(latex_options = "hold_position")
+
+
+ggplot(data.grips, aes(x=GRiPs_Score, y=marginal.effect.gain)) +
+    geom_smooth(method = "lm", formula = y ~ x, color = "red") +
+    geom_point()
+
+#testing the interaction between r/b and Political contoling for the effect of dom responses
+data.grips %>% 
+  dplyr::select(marginal.effect.risk, marginal.effect.gain, Yes, No, GRiPs_Score) %>% 
+  mutate(marginal.effect.risk = -marginal.effect.risk) %>% 
+  reshape2::melt(id = c("GRiPs_Score", "Yes","No") , variable.name = "type", value.name = "beta") -> test
+
+lm.GRiPs <- lm(beta~ type*GRiPs_Score + No, test)
+
+tab <- map_df(list(lm.GRiPs), tidy)
+knitr::kable(tab[c("term", "estimate", "std.error", "statistic", "p.value")], caption = "Predicting AME given R/B and GRiPs")%>%  
+  kable_styling(latex_options = "hold_position")
+```
+

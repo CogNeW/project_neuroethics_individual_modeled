@@ -1,0 +1,185 @@
+colname,text
+MFSQ1,Whether or not someone suffered emotionally 
+MFSQ2,Whether or not some people were treated differently than others
+MFSQ3,Whether or not someone's action showed love for his or her country
+MFSQ4,Whether or not someone showed a lack of respect for authority 
+MFSQ5,Whether or not someone violated standards of purity and decency
+MFSQ6,Whether or not someone was good at math
+MFSQ7,Whether or not someone cared for someone weak or vulnerable
+MFSQ8,Whether or not someone acted unfairly
+MFSQ9,Whether or not someone did something to betray his or her group
+MFSQ10,Whether or not someone conformed to the traditions of society 
+MFSQ11,Whether or not someone did something disgusting
+MFSQ12,Whether or not someone was cruel
+MFSQ13,Whether or not someone was denied his or her rights
+MFSQ14,Whether or not someone showed a lack of loyalty
+MFSQ15,Whether or not an action caused chaos or disorder
+MFSQ16,Whether or not someone acted in a way that God would approve of
+MFSQ17,Compassion for those who are suffering is the most crucial virtue.
+MFSQ18,"When the government makes laws, the number one principle should be ensuring that everyone is treated fairly."
+MFSQ19,I am proud of my country's history.
+MFSQ20,Respect for authority is something all children need to learn.
+MFSQ21,"People should not do things that are disgusting, even if no one is harmed. "
+MFSQ22,It is better to do good than to do bad.
+MFSQ23,One of the worst things a person could do is hurt a defenseless animal.
+MFSQ24,Justice is the most important requirement for a society.
+MFSQ25,"People should be loyal to their family members, even when they have done something wrong.  "
+MFSQ26,Men and women each have different roles to play in society.
+MFSQ27,I would call some acts wrong on the grounds that they are unnatural.
+MFSQ28,It can never be right to kill a human being.
+MFSQ29,I think it's morally wrong that rich children inherit a lot of money while poor children inherit nothing.
+MFSQ30,It is more important to be a team player than to express oneself.
+MFSQ31,"If I were a soldier and disagreed with my commanding officer's orders, I would obey anyway because that is my duty."
+MFSQ32,Chastity is an important and valuable virtue.
+BIG5_1,"Is outgoing, sociable "
+BIG5_2,"Is compassionate, has a soft heart "
+BIG5_3,Tends to be disorganized 
+BIG5_4,"Is relaxed, handles stress well "
+BIG5_5,Has few artistic interests 
+BIG5_6,Has an assertive personality 
+BIG5_7,"Is respectful, treats others with respect "
+BIG5_8,Tends to be lazy 
+BIG5_9,Stays optimistic after experiencing a setback 
+BIG5_10,Is curious about many different things 
+BIG5_11,Rarely feels excited or eager 
+BIG5_12,Tends to find fault with others 
+BIG5_13,"Is dependable, steady "
+BIG5_14,"Is moody, has up and down mood swings "
+BIG5_15,"Is inventive, finds clever ways to do things "
+BIG5_16,Tends to be quiet 
+BIG5_17,Feels little sympathy for others 
+BIG5_18,"Is systematic, likes to keep things in order "
+BIG5_19,Can be tense 
+BIG5_20,"Is fascinated by art, music, or literature "
+BIG5_21,"Is dominant, acts as a leader "
+BIG5_22,Starts arguments with others 
+BIG5_23,Has difficulty getting started on tasks 
+BIG5_24,"Feels secure, comfortable with self "
+BIG5_25,"Avoids intellectual, philosophical discussions "
+BIG5_26,Is less active than other people 
+BIG5_27,Has a forgiving nature 
+BIG5_28,Can be somewhat careless 
+BIG5_29,"Is emotionally stable, not easily upset "
+BIG5_30,Has little creativity 
+BIG5_31,"Is sometimes shy, introverted "
+BIG5_32,Is helpful and unselfish with others 
+BIG5_33,Keeps things neat and tidy 
+BIG5_34,Worries a lot 
+BIG5_35,Values art and beauty 
+BIG5_36,Finds it hard to influence people 
+BIG5_37,Is sometimes rude to others 
+BIG5_38,"Is efficient, gets things done "
+BIG5_39,Often feels sad 
+BIG5_40,"Is complex, a deep thinker "
+BIG5_41,Is full of energy 
+BIG5_42,Is suspicious of others' intentions 
+BIG5_43,"Is reliable, can always be counted on "
+BIG5_44,Keeps their emotions under control 
+BIG5_45,Has difficulty imagining things 
+BIG5_46,Is talkative 
+BIG5_47,Can be cold and uncaring 
+BIG5_48,"Leaves a mess, doesn't clean up "
+BIG5_49,Rarely feels anxious or afraid 
+BIG5_50,Thinks poetry and plays are boring 
+BIG5_51,Prefers to have others take charge 
+BIG5_52,"Is polite, courteous to others "
+BIG5_53,"Is persistent, works until the task is finished "
+BIG5_54,"Tends to feel depressed, blue "
+BIG5_55,Has little interest in abstract ideas 
+BIG5_56,Shows a lot of enthusiasm 
+BIG5_57,Assumes the best about people 
+BIG5_58,Sometimes behaves irresponsibly 
+BIG5_59,"Is temperamental, gets emotional easily "
+BIG5_60,"Is original, comes up with new ideas "
+sex,What gender do you most identify with?
+age,What is your age? - Age
+race_ethnicity,Which race/ethnicity best describes you?
+education,What is the highest level of education that you have achieved?
+ReligionRaised,What tradition were you raised in?
+ReligionNow,What tradition do you consider yourself now?
+Religiosity,How religious do you consider yourself?
+Spirituality,How spiritual do you consider yourself?
+AttendChurch,How often do you attend church or other religious meetings?
+ReligiousActivity,"How much time do you spend in religious/spiritual activities, such as prayer?"
+meditation,How often do you practice meditation?
+RelationshipStatus,What is your relationship status?
+Income,What is your total yearly income (rounded to the nearest dollar)?
+Major,What is your college major? Current and anything in the past.
+YearOfEducation,How many years of total education have you had? (including elementary through high school)
+EmploymentStatus,Current employment status - field and role?
+Political_Party,Please select which you identify
+HumanMind,"If you had to choose, do you think that human minds are more like computers or souls?"
+Optimize,Have you ever used a device to optimize cognition?
+republican,Republican
+democrat,Democrat
+independent,Independent
+conservative,Conservative
+liberal,Liberal
+POWER,"POWER (social power, authority, wealth)"
+SELF.DIRECTION,"SELF-DIRECTION (creativity, freedom, curiosity, independence, choosing one's own goals)"
+ACHIEVEMENT,"ACHIEVEMENT (success, capability, ambition, influence on people and events)"
+HEDONISM,"HEDONISM (gratification of desires, enjoyment in life, self-indulgence)"
+STIMULATION,"STIMULATION (daring, a varied and challenging life, an exciting life)"
+UNIVERSALISM,"UNIVERSALISM (broad-mindedness, beauty of nature and arts, social justice, a world at peace, equality, wisdom, unity with nature, environmental protection)"
+attention_check.3,"IF YOU ARE READING THIS (please select ""Of supreme importance (8)"")"
+BENEVOLENCE,"BENEVOLENCE (helpfulness, honesty, forgiveness, loyalty, responsibility)"
+TRADITION,"TRADITION (respect for tradition, humbleness accepting one's portion in life, devotion, modesty)"
+CONFORMITY,"CONFORMITY (obedience, honoring parents and elders, self-discipline, politeness)"
+SECURITY,"SECURITY (national security, family security, social order, cleanliness, reciprocation of favors)"
+MC_Lying,Which of the following statements best characterizes your position on lying?
+MC_Assassin,Which of the following statements best characterizes your position on assassination?
+MC_Torture,Which of the following statements best characterizes your position on torture?
+MC_Murder,Which of the following statements best characterizes your position on murder?
+MC_Stealing,Which of the following statements best characterizes your position on stealing?
+MC_Steril,Which of the following statements best characterizes your position on forced sterilization?
+FS1,"I daydream and fantasize, with some regularity, about things that might happen to me."
+EC1,"I often have tender, concerned feelings for people less fortunate than me."
+PT1,"I sometimes find it difficult to see things from the ""other guy's"" point of view."
+EC2,Sometimes I don't feel very sorry for other people when they are having problems.
+FS2,I really get involved with the feelings of the characters in a novel.
+PD1,"In emergency situations, I feel apprehensive and ill-at-ease."
+FS3,"I am usually objective when I watch a movie or play, and I don't often get completely caught up in it."
+PT2,I try to look at everybody's side of a disagreement before I make a decision.
+EC3,"When I see someone being taken advantage of, I feel kind of protective towards them."
+PD2,I sometimes feel helpless when I am in the middle of a very emotional situation.
+PT3,I sometimes try to understand my friends better by imagining how things look from their perspective.
+FS4,Becoming extremely involved in a good book or movie is somewhat rare for me.
+PD3,"When I see someone get hurt, I tend to remain calm."
+EC4,Other people's misfortunes do not usually disturb me a great deal.
+PT4,"If I'm sure I'm right about something, I don't waste much time listening to other people's arguments."
+FS5,"After seeing a play or movie, I have felt as though I were one of the characters."
+PD4,Being in a tense emotional situation scares me.
+EC5,"When I see someone being treated unfairly, I sometimes don't feel very much pity for them."
+PD5,I am usually pretty effective in dealing with emergencies.
+EC6,I am often quite touched by things that I see happen.
+PT5,I believe that there are two sides to every question and try to look at them both.
+EC7,I would describe myself as a pretty soft-hearted person.
+FS6,"When I watch a good movie, I can very easily put myself in the place of a leading character."
+attention_check.4,"If you are reading this, please select ""Does not describe me well A""."
+PD6,I tend to lose control during emergencies.
+PT6,"When I'm upset at someone, I usually try to ""put myself in his shoes"" for a while."
+FS7,"When I am reading an interesting story or novel, I imagine how I would feel if the events in the story were happening to me."
+PD7,"When I see someone who badly needs help in an emergency, I go to pieces."
+PT7,"Before criticizing somebody, I try to imagine how I would feel if I were in their place."
+SNS1,How good are you at working with fractions?
+SNS2,How good are you at working with percentages?
+SNS3,How good are you at calculating a 15% tip?
+SNS4,How good are you at figuring out how much a shirt will cost if it is 25% off?
+SNS5,"When reading the newspaper, how helpful do you find tables and graphs that are parts of a story?"
+SNS6,"When people tell you the chance of something happening, do you prefer that they use words (""it rarely happens"") or numbers (""there's a 1% chance"")?"
+SNS7,"When you hear a weather forecast, do you prefer predictions using percentages (e.g., there will be a 20% chance of rain today) or predictions using only words (e.g., there is a small chance of rain today)?"
+SNS8,How often do you find numerical information to be useful?
+Berlin1,"Out of 1,000 people in a small town 500 are members of a choir. Out of these 500 members in the choir 100 are men. Out of the 500 inhabitants that are not in the choir 300 are men. What is the probability that a randomly drawn man is a member of the choir? 
+"
+Berlin2,"Imagine we are throwing a five-sided die 50 times. On average, out of these 50 throws how many times would this five-sided die show an odd number (1, 3 or 5)?"
+Berlin3,"Imagine we are throwing a loaded die (6 sides). The probability that the die shows a 6 is twice as high as the probability of each of the other numbers. On average, out of these 70 throws how many times would the die show the number 6?
+"
+Berlin4,"In a forest 20% of mushrooms are red, 50% brown and 30% white. A red mushroom is poisonous with a probability of 20%. A mushroom that is not red is poisonous with a probability of 5%. What is the probability that a poisonous mushroom in the forest is red?"
+GRiPS_1,Taking risks makes life more fun
+GRiPS_2,My friends would say that I'm a risk taker
+GRiPS_3,I enjoy taking risks in most aspects of my life
+GRiPS_4,I would take a risk even if it meant I might get hurt
+GRiPS_5,Taking risks is an important part of my life
+GRiPS_6,I commonly make risky decisions
+GRiPS_7,I am a believer of taking chances
+GRiPS_8,"I am attracted, rather than scared, by risk"

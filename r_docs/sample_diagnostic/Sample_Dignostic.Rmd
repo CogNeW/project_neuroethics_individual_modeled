@@ -1,0 +1,45 @@
+---
+title: "Sample Dignostic"
+author: "Kianté Fernandez"
+date: "5/19/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+library(reshape2)
+library(readr)
+library(psych)
+library(dplyr)
+```
+
+```{r load data set,include=FALSE}
+data <- read.csv("../data/Cleaned_Pilot/Cleaned_Pilot.07.csv", header=TRUE, comment.char="#", stringsAsFactors=TRUE) %>%
+    dplyr::select(user_id, risk, gain, no_effect,condition, experimental_treatment_selected, trial_index, sex, age, education,race_ethnicity,Risk_Beta , Gain_Beta , Interaction_Beta, lambda)
+
+x <- distinct(select(data, user_id, condition,experimental_treatment_selected, age, sex, education, race_ethnicity))
+opts <- options(knitr.kable.NA = "")
+```
+
+##Data analytics
+
+```{r table, fig.height=7, fig.width=12, dpi=300}
+
+knitr::kable(summary(x[1:4]))
+knitr::kable(summary(x[5:7]))
+
+```
+
+(1)  Totals for the raw sample size for all batches w/ a max of .70 risk
+
+
+(2)  The sample size after running exclusions 
+
+
+
+(3)  Do we have relatively even #'s per cognition type?
