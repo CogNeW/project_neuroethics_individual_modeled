@@ -1,0 +1,434 @@
+---
+title: "TimeDDM-Neuroethics"
+output: html_document
+date: "2023-11-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Install libraries
+
+```{r}
+library(runjags)
+library(dplyr)
+```
+
+# Read Files
+
+```{r}
+base_dir = "C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS"
+behavior_path = paste(base_dir, "/data/FINAL_RT_EXCLUDED_DATA_20240417.RData", sep="")
+load(behavior_path)
+```
+
+# Transform Data
+
+```{r}
+risk_data <- risk_data %>% 
+  # filter(rt <= 5000) %>% 
+  mutate(rt = rt / 1000)
+
+
+# Assuming risk_data is your dataframe
+risk_data <- risk_data %>%
+  mutate(
+    response = ifelse(experimental_treatment_selected == "Yes to treatment", 1, 0),
+    RT = if_else(response == 0, -rt, rt), # Multiply by -1 if response is 0
+    risk = risk * 0.01,                   # Scale risk by 0.01
+    gain = gain * 0.01,                    # Scale gain by 0.01
+    no_effect = no_effect * 0.01
+  )
+
+# This will assign a unique index to each different 'subj_idx'
+risk_data$idxP <- as.numeric(as.factor(risk_data$user_id))
+```
+
+# Stop Time DDM
+
+## Define the stDDM
+
+```{r}
+run_stDDM = function(risk_data){
+  chen_folder = paste(base_dir, '/analysis/timeDDM/Chen-2021', sep='')
+  scripts_folder = paste(chen_folder, '/Scripts/Model fitting', sep='')  
+  results_folder = paste(chen_folder, '/Scripts/ModelResults/Neuroethics', sep='')
+  
+  idxP = risk_data$idxP
+  
+  hd = (risk_data$gain) # gain probability
+  td = (risk_data$risk) # risk probability
+  
+  rtpos = risk_data$rt
+  
+  y= risk_data$RT
+  
+  N = length(y)
+  ns = length(unique(idxP))
+  
+  #--------------------------------------------
+  # fit the model
+  
+  dat <- dump.format(list(N=N, y=y, idxP=idxP, hd=hd, td=td, rt=rtpos, ns=ns))
+  
+  inits3 <- dump.format(list( alpha.mu=2, alpha.pr=0.05,  time.mu=0.5, time.pr= 0.05, theta.mu=0.1,
+                              theta.pr=0.05,  b1.mu=0.3, b1.pr=0.05, b2.mu=0.01, b2.pr=0.05, bias.mu=0.4,
+                              bias.kappa=1, y_pred=y,  .RNG.name="base::Super-Duper", .RNG.seed=99999))
+  
+  
+  inits2 <- dump.format(list( alpha.mu=2.2, alpha.pr=0.05, time.mu=-0.1, time.pr= 0.05, theta.mu=0.01,
+                              theta.pr=0.05, b1.mu=0.3, b1.pr=0.05, b2.mu=0.1, b2.pr=0.05, bias.mu=0.5,
+                              bias.kappa=1, y_pred=y,  .RNG.name="base::Wichmann-Hill", .RNG.seed=1234))
+  
+  inits1 <- dump.format(list( alpha.mu=2.4, alpha.pr=0.05, time.mu=0, time.pr= 0.05, theta.mu=0.15,
+                              theta.pr=0.05, b1.mu=0.1, b1.pr=0.05, b2.mu=0.05, b2.pr=0.05, bias.mu=0.3,
+                              bias.kappa=1, y_pred=y, .RNG.name="base::Mersenne-Twister", .RNG.seed=6666 ))
+  
+  # monitor = c( "ld_comp",
+    # "b1.mu", "b2.mu", "theta.mu", "alpha.mu","bias.mu","time.mu", "b1.p", "time.pr","time", "b2.p",  "theta.p", "bias","alpha.p") #,"deviance", "pd", "dic")
+  
+  monitor = c("b1.mu")
+  
+  results <- run.jags(model=file.path(scripts_folder,"tssmHT_model_priors_M1.txt"), 
+                      monitor=monitor, data=dat, n.chains=3, inits=c(inits1,inits2, inits3), 
+                      plots = TRUE, adapt=10, method="parallel", module="wiener", burnin=10, sample=100, thin=1)
+  
+  return(results)
+
+}
+```
+
+```{r}
+run_stDDM_individual = function(risk_data){
+  chen_folder = paste(base_dir, '/analysis/timeDDM/Chen-2021', sep='')
+  scripts_folder = paste(chen_folder, '/Scripts/Model fitting', sep='')  
+  results_folder = paste(chen_folder, '/Scripts/ModelResults/Neuroethics', sep='')
+  
+  idxP = risk_data$idxP
+  # print(idxP)
+  
+  hd = (risk_data$gain) # gain probability
+  td = (risk_data$risk) # risk probability
+  
+  rtpos = risk_data$rt
+  
+  y= risk_data$RT
+  
+  N = length(y)
+  ns = length(unique(idxP))
+  
+  #--------------------------------------------
+  # fit the model
+  
+  dat <- dump.format(list(N=N, y=y, hd=hd, td=td, rt=rtpos))
+  
+  inits3 <- dump.format(list( alpha.mu=2, alpha.pr=0.05,  time.mu=0.5, theta.mu=0.1,
+                              theta.pr=0.05,  b1.mu=0.3, b2.mu=0.01, bias.mu=0.4,
+                              bias.kappa=1, y_pred=y,  .RNG.name="base::Super-Duper", .RNG.seed=99999))
+  
+  inits2 <- dump.format(list( alpha.mu=2.2, alpha.pr=0.05, time.mu=-0.1, theta.mu=0.01,                              theta.pr=0.05, b1.mu=0.3, b2.mu=0.1, bias.mu=0.5,
+                              bias.kappa=1, y_pred=y,  .RNG.name="base::Wichmann-Hill", .RNG.seed=1234))
+  
+  inits1 <- dump.format(list( alpha.mu=2.4, alpha.pr=0.05, time.mu=0, theta.mu=0.15,
+                              theta.pr=0.05, b1.mu=0.1, b2.mu=0.05, bias.mu=0.3,
+                              bias.kappa=1, y_pred=y, .RNG.name="base::Mersenne-Twister", .RNG.seed=6666 ))
+  
+  monitor = c(
+    "b1.mu", "b2.mu", "theta.mu", "alpha.mu", "time.mu", "bias.mu", "bias", "ld_comp") #,"deviance", "pd", "dic")
+  
+  results <- run.jags(model=file.path(scripts_folder,"tssmHT_individual_model_priors_M1.txt"), 
+                      monitor=monitor, data=dat, n.chains=3, inits=c(inits1,inits2, inits3), method="parallel",
+                      plots = TRUE, module="wiener", burnin=1000, sample=5000, thin=1)
+  
+  return(results)
+}
+```
+
+
+## Run the stDDM over all subjects
+
+```{r}
+chen_folder = paste(base_dir, '/analysis/timeDDM/Chen-2021', sep='')
+scripts_folder = paste(chen_folder, '/Scripts/Model fitting', sep='')  
+results_folder = paste(chen_folder, '/Scripts/ModelResults/Neuroethics', sep='')
+results = run_stDDM(risk_data)
+stddm_summary <- summary(results)
+write.csv(stddm_summary, file=paste(c(file.path(results_folder,"20240417FINALSTDDMResults"), ".csv"), collapse = "") ) 
+```
+
+
+## Run the stDDM over subject subsamples
+
+We will take subsamples of the original data and run the function to be able to compare it to a normal DDM.
+
+```{r}
+set.seed(123)
+for (i in 1:1) {
+  start_time <- Sys.time()
+  # Step 1: Select 50 unique user_ids randomly
+  selected_user_ids <- sample(unique(risk_data$user_id), 50)
+  
+  # Step 2: Filter rows that match the selected user_ids
+  subset_data <- risk_data %>% filter(user_id %in% selected_user_ids)
+  subset_data$idxP <- as.numeric(as.factor(subset_data$user_id))
+  
+  # Step 3: Run your function with this subset
+  result <- run_stDDM(subset_data)
+  suum = summary(result)
+  
+  # Optional: Do something with the result, e.g., store it for later analysis
+  # This depends on what you want to do with the results
+  end_time <- Sys.time() # End timing
+  elapsed_time <- end_time - start_time # Calculate elapsed time
+  
+  print(elapsed_time)
+}
+```
+
+# Run normal DDM
+
+## Define normal DDM
+
+```{r}
+run_normal_DDM = function(risk_data){
+  chen_folder = paste(base_dir, '/analysis/timeDDM/Chen-2021', sep='')
+  scripts_folder = paste(chen_folder, '/Scripts/Model fitting', sep='')  
+  results_folder = paste(chen_folder, '/Scripts/ModelResults/Neuroethics', sep='')
+  
+  idxP = risk_data$idxP
+  
+  hd = (risk_data$gain) # gain probability
+  td = (risk_data$risk) # risk probability
+  
+  rtpos = risk_data$rt
+  
+  y= risk_data$RT
+  
+  N = length(y)
+  ns = length(unique(idxP))
+  
+  #--------------------------------------------
+  # fit the model
+  
+  dat <- dump.format(list(N=N, y=y, idxP=idxP, hd=hd, td=td, rt=rtpos, ns=ns))
+  
+  inits3 <- dump.format(list( alpha.mu=2, alpha.pr=0.05,  time.mu=0.5, time.pr= 0.05, theta.mu=0.1,
+                              theta.pr=0.05,  b1.mu=0.3, b1.pr=0.05, b2.mu=0.01, b2.pr=0.05, bias.mu=0.4,
+                              bias.kappa=1, y_pred=y,  .RNG.name="base::Super-Duper", .RNG.seed=99999))
+  
+  
+  inits2 <- dump.format(list( alpha.mu=2.2, alpha.pr=0.05, time.mu=-0.1, time.pr= 0.05, theta.mu=0.01,
+                              theta.pr=0.05, b1.mu=0.3, b1.pr=0.05, b2.mu=0.1, b2.pr=0.05, bias.mu=0.5,
+                              bias.kappa=1, y_pred=y,  .RNG.name="base::Wichmann-Hill", .RNG.seed=1234))
+  
+  inits1 <- dump.format(list( alpha.mu=2.4, alpha.pr=0.05, time.mu=0, time.pr= 0.05, theta.mu=0.15,
+                              theta.pr=0.05, b1.mu=0.1, b1.pr=0.05, b2.mu=0.05, b2.pr=0.05, bias.mu=0.3,
+                              bias.kappa=1, y_pred=y, .RNG.name="base::Mersenne-Twister", .RNG.seed=6666 ))
+  
+  monitor = c(
+    "b1.mu", "b2.mu", "theta.mu", "alpha.mu","bias.mu", "b1.p", "time", "b2.p",  "theta.p", "bias","alpha.p") #,"deviance", "pd", "dic")
+  
+  
+  results <- run.jags(model=file.path(scripts_folder,"tssmHT_modelWIENER_standardDDM.txt"), 
+                      monitor=monitor, data=dat, n.chains=3, inits=c(inits1,inits2, inits3), 
+                      plots = TRUE, method="parallel", module="wiener", burnin=1000, sample=5000, thin=1)
+  
+  return(results)
+
+}
+```
+
+```{r}
+run_normal_DDM_individual = function(risk_data){
+  chen_folder = paste(base_dir, '/analysis/timeDDM/Chen-2021', sep='')
+  scripts_folder = paste(chen_folder, '/Scripts/Model fitting', sep='')  
+  results_folder = paste(chen_folder, '/Scripts/ModelResults/Neuroethics', sep='')
+  
+  
+  idxP = risk_data$idxP
+  
+  hd = (risk_data$gain) # gain probability
+  td = (risk_data$risk) # risk probability
+  
+  rtpos = risk_data$rt
+  
+  y= risk_data$RT
+  
+  N = length(y)
+  ns = length(unique(idxP))
+  
+  #--------------------------------------------
+  # fit the model
+  
+  dat <- dump.format(list(N=N, y=y, hd=hd, td=td, rt=rtpos))
+  
+  
+  inits3 <- dump.format(list( alpha.mu=2, theta.mu=0.1, b1.mu=0.3, b2.mu=0.01, bias.mu=0.4,
+                              bias.kappa=1, y_pred=y,  .RNG.name="base::Super-Duper", .RNG.seed=99999))
+  
+  
+  inits2 <- dump.format(list( alpha.mu=2.2, theta.mu=0.01, b1.mu=0.3, b2.mu=0.1, bias.mu=0.5,
+                              bias.kappa=1, y_pred=y,  .RNG.name="base::Wichmann-Hill", .RNG.seed=1234))
+  
+  inits1 <- dump.format(list( alpha.mu=2.4, time.mu=0, theta.mu=0.15, b1.mu=0.1, b2.mu=0.05, bias.mu=0.3,
+                              bias.kappa=1, y_pred=y, .RNG.name="base::Mersenne-Twister", .RNG.seed=6666 ))
+  
+  monitor = c(
+    "b1.mu", "b2.mu", "theta.mu", "alpha.mu","bias.mu", "bias", "ld_comp") #,"deviance", "pd", "dic")
+  
+  
+  results <- run.jags(model=file.path(scripts_folder,"tssmHT_modelWIENER_standardDDM_individual"), 
+                      monitor=monitor, data=dat, n.chains=3, inits=c(inits1,inits2, inits3), 
+                      plots = TRUE, method="parallel", module="wiener", burnin=1000, sample=5000, thin=1)
+  
+  return(results)
+}
+```
+
+## Run the normal DDM over all subjects
+
+```{r}
+chen_folder = paste(base_dir, '/analysis/timeDDM/Chen-2021', sep='')
+scripts_folder = paste(chen_folder, '/Scripts/Model fitting', sep='')  
+results_folder = paste(chen_folder, '/Scripts/ModelResults/Neuroethics', sep='')
+results = run_normal_DDM(risk_data)
+normal_summary <- summary(results)
+write.csv(normal_summary, file=paste(c(file.path(results_folder,"20240417FINALNORMALDDMResults"), ".csv"), collapse = "") ) 
+```
+
+## Run the normal DDM over individual subjects
+
+```{r}
+user_ids = unique(risk_data$user_id)
+
+for (i in 1:length(user_ids)){
+  start_time <- Sys.time()
+  selected_user_id = user_ids[i]
+  subset_data <- risk_data %>% filter(user_id == selected_user_id)
+  print(length(subset_data))
+  subset_data$idxP <- as.numeric(as.factor(subset_data$user_id))
+  result <- run_normal_DDM_individual(subset_data)
+  end_time <- Sys.time() # End timing
+  elapsed_time <- end_time - start_time # Calculate elapsed time
+  print(elapsed_time)
+  break
+}
+```
+
+
+
+Loo Comparison
+
+## Run both models for one subject and compare their loo
+
+```{r}
+library(loo)
+library(coda)
+
+extract_loo = function(df){
+  num_iterations <- 5000
+  num_chains <- 3
+  cols_with_ld_comp <- grep("ld_comp", colnames(df$mcmc[[1]]))
+num_data_points <- length(cols_with_ld_comp)
+  extracted_array <- array(NA, dim = c(num_iterations, num_chains, num_data_points))
+  # browser()
+  # Loop over each chain
+  for (chain in 1:num_chains) {
+    # Find column indices that contain 'ld_comp'
+    cols_with_ld_comp <- grep("ld_comp", colnames(df$mcmc[[chain]]))
+  
+    # Check if the number of 'ld_comp' columns matches the expected number
+    if (length(cols_with_ld_comp) == num_data_points) {
+      extracted_array[, chain, ] <- df$mcmc[[chain]][, cols_with_ld_comp]
+    } else {
+      stop("Unexpected number of 'ld_comp' columns found")
+    }
+  }
+  # browser()
+  es = effectiveSize(df$mcmc[,cols_with_ld_comp])
+  computed_loo = loo(extracted_array, cores=getOption("mc.cores", 4), r_eff=es)
+  return(computed_loo$estimates["looic", "Estimate"])
+
+# Now, extracted_array is filled with the data in the format you wanted
+  
+  
+  # rows_of_interest <- grep("ld_comp", rownames(df))
+  # col_index = which(colnames(stddm_summary) == "Mean")
+  # extracted_values <- df[rows_of_interest, col_index]
+  # extracted_matrix <- as.matrix(extracted_values)
+  # computed_loo = loo(extracted_matrix, cores=getOption("mc.cores", 4))
+  # browser()
+  # return(computed_loo$estimates["looic", "Estimate"])
+}
+
+extract_waic = function(df){
+  rows_of_interest <- grep("ld_comp", rownames(df))
+  col_index = which(colnames(df) == "Mean")
+  extracted_values <- df[rows_of_interest, col_index]
+  extracted_matrix <- as.matrix(extracted_values)
+  browser()
+  computed_waic = waic(extracted_matrix, cores=getOption("mc.cores", 4))
+  return(computed_waic$estimates["waic", "Estimate"])
+}
+
+compute_loo = function(normal_summary, stddm_summary){
+  normal_loo = extract_loo(normal_summary)
+  stddm_loo = extract_loo(stddm_summary)
+  if (normal_loo > stddm_loo) {
+    return(1) # Return 1 if stddm is better
+  }
+  return(0)
+}
+
+compute_dic = function(normal_result, stddm_result){
+  normal_dic = extract.runjags(normal_result, "dic")
+  stddm_dic = extract.runjags(stddm_result, "dic")
+  if (normal_dic > stddm_dic) {
+    return(1) # Return 1 if stddm is better
+  }
+  return(0)
+}
+
+compute_waic = function(normal_summary, stddm_summary){
+  normal_waic = extract_waic(normal_summary)
+  stddm_waic = extract_waic(stddm_summary)
+  if (normal_waic > stddm_waic) {
+    return(1) # Return 1 if stddm is better
+  }
+  return(0)
+}
+
+
+
+```
+
+
+
+```{r}
+user_ids = unique(risk_data$user_id)
+
+total_stddm_better = 0
+set.seed(123)
+start_time <- Sys.time()
+
+for (i in 1:length(user_ids)){
+  print(paste("i: ", i))
+  selected_user_id = user_ids[i]
+  subset_data <- risk_data %>% filter(user_id == selected_user_id)
+  subset_data$idxP <- as.numeric(as.factor(subset_data$user_id))
+  normal_result <- run_normal_DDM_individual(subset_data)
+  # normal_summary <- summary(normal_result)
+  stddm_result <- run_stDDM_individual(subset_data)
+  # stddm_summary <- summary(stddm_result)
+  end_time <- Sys.time() # End timing
+  total_stddm_better = total_stddm_better + compute_loo(normal_result, stddm_result)
+  # total_stddm_better = total_stddm_better + compute_dic(stddm_result, normal_result)
+  print(paste("Total stddm_better: ", total_stddm_better))
+}
+end_time <- Sys.time() # End timing
+elapsed_time <- end_time - start_time # Calculate elapsed time
+print(elapsed_time)
+```
+
+

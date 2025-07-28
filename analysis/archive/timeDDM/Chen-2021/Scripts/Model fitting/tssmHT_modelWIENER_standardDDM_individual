@@ -1,0 +1,110 @@
+model {
+
+    # Mean estimates of the linear regressions for the weights
+
+        b1.mu ~ dnorm(0, 1) # hd: magnitude
+
+        b2.mu ~ dnorm(0, 1) # td: probability
+        
+	# mean estimates DDM parameters
+
+        alpha.mu ~ dunif(0.001, 5) # boundary 
+
+        theta.mu ~ dunif(0, 10) # non decision times
+
+
+	# Error terms for nDT
+
+        alpha.pr ~ dgamma(1, 0.1) 
+
+        theta.pr ~ dgamma(1, 0.1)
+
+
+    # error term for the regression function
+
+        e.sG <- pow(e.m,2) / pow(e.d,2)
+
+        e.rG <- e.m / pow(e.d,2)
+
+        e.m ~ dgamma(1,0.2)T(0.001,20)
+
+        e.d ~ dgamma(1,0.5)T(0.001,20)
+
+        e.tau ~ dgamma(e.sG, e.rG)T(0.001,20)
+
+
+    # error term for the bias
+
+        lambda.sG <- pow(lambda.m,2) / pow(lambda.d,2)
+
+        lambda.rG <- lambda.m / pow(lambda.d,2)
+
+        lambda.m ~ dgamma(1,0.2)T(0.001,20)
+
+        lambda.d ~ dgamma(1,0.5)T(0.001,20)
+
+        lambda.tau ~ dgamma(lambda.sG, lambda.rG)T(0.001,20)
+
+
+    # error term for nDT
+
+        chi.sG <- pow(chi.m,2) / pow(chi.d,2)
+
+        chi.rG <- chi.m / pow(chi.d,2)
+
+        chi.m ~ dgamma(1,0.2)T(0.001,20)
+
+        chi.d ~ dgamma(1,0.5)T(0.001,20)
+
+        chi.tau ~ dgamma(chi.sG, chi.rG)T(0.001,20)
+
+
+    # Bias of the DDM
+
+        bias.alpha <- bias.mu * bias.kappa
+
+        bias.beta <- (1 - bias.mu) * bias.kappa
+
+        bias.mu ~ dbeta(2, 2)T(0.01,0.99)
+
+        bias.kappa ~ dgamma(1, 0.5)
+
+        bias ~ dbeta(bias.alpha, bias.beta)T(0.01,0.99)
+
+
+    # timeIn of the DDM
+
+        time.mu ~ dnorm(0, 1)
+
+    for (i in 1:N) { # trial level
+
+        y[i] ~ dwiener(bound[i] , tau[i], bet[i], w[i]) 
+        ld_comp[i] <- dlogwiener(y[i], bound[i] , tau[i], bet[i], w[i])
+        
+        # drift variability is set to 1
+
+        # generate predictions
+        y_pred[i] ~ dwiener(bound[i] , tau[i], bet[i], w[i])
+        
+        # generate trial-by-trial boundary
+        bound[i] <- alpha.mu
+
+        # generate trial-by-trial nDT
+        tau[i] <- theta.mu
+        dT[i] <- rt[i] - tau[i]
+
+        # generate trial-by-trial Bias
+          bet[i] <- bias
+
+        # The actual drift rate
+        w[i] ~ dnorm(li.hat[i], e.tau)
+
+        li.hat[i] <- vd_m[i] +vd_p[i]
+
+        # The linear regression of the value probabilities and value magnitude
+        vd_m[i] <-  b1.mu * hd[i] # magnitude
+        vd_p[i] <-  b2.mu * td[i] # probabilities
+    }
+    
+}
+
