@@ -1,6 +1,4 @@
-# Individual Differences in Risk & Benefit Sensitivity in Neuroethical Judgments About Neuromodulation
-
-# Modeling Decision-Making Processes in Cognitive Enhancement 
+# Code for 'The Dynamics of Neuroethical Decisions Depend on Psychological Traits'
 
 > **Authors:**  
 > Brian Kim<sup>1</sup>, Kiante Fernandez<sup>1,2</sup>, John D. Medaglia<sup>1,3</sup>  
@@ -10,9 +8,8 @@
 
 This repository contains analysis code and data related to research on characterizing individual differences in decision-making processes, specifically focusing on risk and benefit sensitivity in the context of cognitive enhancement attitudes.
 
-## Manuscripts
-- Fernandez, K., Erickson, B.A., Kable, J.W., Hamilton, R.H., Medaglia, J.D. *Evaluating Risks and Benefit sensitivity for Cognitive Enhancement*. (2023).
-- Kim, B., Fernandez, K., Medaglia, J.D. *Evaluating Individual Differences in Decision-Making Processes in Risk and Benefit Sensitivity toward Cognitive Enhancement Attitudes Using the Drift Diffusion Model*. (2023).
+## Related Manuscripts
+- Fernandez, K., Erickson, B. A., Kable, J. W., Hamilton, R. H., & Medaglia, J. D. (2025). Evaluating Risk and Benefit Sensitivity for Cognitive Treatments. Journal of Cognitive Enhancement. https://doi.org/10.1007/s41465-025-00319-3
   
 ## Repository Contents
 - Navigate to the `analysis` and `r_docs` directories to run the R scripts
