@@ -8,43 +8,113 @@
 
 This repository contains analysis code and data related to research on characterizing individual differences in decision-making processes, specifically focusing on risk and benefit sensitivity in the context of cognitive enhancement attitudes.
 
+## Terminology
+
+The manuscript reports these constructs as **harm** and **cure** probabilities. The
+code and stored data predate that change and still use the earlier *risk* / *benefit*
+(or *gain*) vocabulary internally. The mapping is one-to-one:
+
+| Manuscript term | Code / data term | Variable |
+| --- | --- | --- |
+| Harm probability, harm sensitivity | Risk probability, risk sensitivity | `b_risk`, `risk` |
+| Cure probability, cure sensitivity | Benefit / gain probability, gain sensitivity | `b_gain`, `gain` |
+| Cure first / harm first (latency) | Benefits first / risks first | `time` |
+
+Only the strings that appear in rendered figures were updated to the new terms.
+Variable names, column names, and `.RData` object names were deliberately left
+unchanged so that saved model fits and joins continue to work. Note that
+`Risk Taking (GRiPS)` is the name of a published scale and is not part of this
+mapping.
+
 ## Related Manuscripts
 - Fernandez, K., Erickson, B. A., Kable, J. W., Hamilton, R. H., & Medaglia, J. D. (2025). Evaluating Risk and Benefit Sensitivity for Cognitive Treatments. Journal of Cognitive Enhancement. https://doi.org/10.1007/s41465-025-00319-3
   
 ## Repository Contents
-- Navigate to the `analysis` and `r_docs` directories to run the R scripts
-- The `data` directory hosts raw and cleaned datasets. For details see [data dictionary](https://github.com/CogNeW/project_neuroethics_individual_difference/tree/master/data)
-- The `images` directory contains figures 
-- `output` houses intermediate data objects used in the analysis.
-
-## Getting Started
-To work with the datasets and analysis scripts:
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/CogNeW/project_neuroethics_individual_difference.git
-   cd project_neuroethics_individual_difference
-   ```
+- The `analysis` folder hosts our main analysis and figure generation scripts
+   - `finalDDM/` contains the finalized versions used for the paper
+   - `archive/` contains intermediate draft versions used for development
+- The `data` directory hosts raw and cleaned datasets.
 
 # Scripts of Interest (DDM Analysis)
 
 ## Time-Varying and standard DDM
 
 The Time-Varying DDM was based off of [Chen et al.](https://www.nature.com/articles/s41598-022-15432-y).
-The files are included under `analysis/timeDDM/Chen-2021/Scripts/Model Fitting`
 
-1. `Neuroethics-stDDM.Rmd` - contains R code for runJags. Can run both the start-time DDM (stDDM / time-varying) and normal DDM on all participants as well as on individual participants.
-2. `tssmHT_model_priors_M1.txt` - contains prior specifications for the stDDM. The specifications are hierarchical with both group-level and individual-level parameters being estimated.
-3. `tssmHT_individual_model_priors_M1.txt` - contains non-hierarchical specifications for the stDDM. This file is used to computed parameters for individual participants. 
-4. `tssmHT_modelWIENER_standardDDM.txt` - contains prior specificatons for standard 4-parameter DDM. The specifications are hierarchical with both group-level and individual-level parameters being estimated.
-5. `tssmHT_modelWIENER_standardDDM_individual` - contains non-hierarchical specifications for the standard 4-parameter DDM. This file is used to computed parameters for individual participants. 
+The main analysis script is included under `analysis/finalDDM/kim_analysis_stddm`. The file references two jags model configurations, specifically `analysis/finalDDM/stddm_model_M0.txt` and `analysis/finalDDM/stddm_model_M1.txt`, which specify the simple and time-varying (start-time) DDM respectively.
 
-The other specification models are those included by Chen et al. in [their OSF](https://osf.io/k8g39/). These additional models were for additional assumptions and comparisons that were used in their paper. 
 
-The results will be saved into the folder `analysis/timeDDM/Chen-2021/Scripts/Model Results`
+
 
 ## Regression Analysis
 
 Our Regression analysis will be done in `analysis/DDM_STDDM_Regression.Rmd`. This analysis will read the stDDM results from `analysis/timeDDM/Chen-2021/Scripts/ModelResults/Neuroethics/20240313STDDMResults.csv` and perform regressions based on individual variables read from `data/Cleaned_Pilot/exclusions.2020.10.21.Rdata`.
+
+## Participant Exclusions and Robustness (reviewer response)
+
+`analysis/finalDDM/exclusion_robustness.R` addresses the reviewer question about
+the 240 participants excluded from the recruited sample of 616. It is standalone:
+it reads `data/raw_mturk_data/raw.csv`,
+`data/Cleaned_Pilot/exclusions.2020.10.21.RData`,
+`data/FINAL_RT_EXCLUDED_DATA_20241014.RData`,
+`analysis/finalDDM/FINAL_PARTICIPANT_LIST.RData` and
+`analysis/finalDDM/final_ddm_ideological_combined.RData`, and writes every table,
+figure and a full text transcript to
+`analysis/finalDDM/Figures/ExclusionRobustness/`. Run it with
+`Rscript analysis/finalDDM/exclusion_robustness.R` (needs `dplyr`, `tidyr`,
+`ggplot2`, `psych`, `arm`); it takes a couple of minutes.
+
+What it produces:
+
+1. **Exclusion cascade** (616 -> 610 -> 425 -> 382 -> 376), reconciling exactly to
+   the n = 240 reported in the manuscript. The 240 is a total across several
+   criteria: 6 with no usable record, 185 removed by the prior-study criteria
+   applied upstream (Fernandez et al., 2025), 43 for choice profile, and 6
+   dropped between the DDM fit and the analysis sample.
+2. **The response criterion as implemented.** The Methods text says participants
+   without both response types were excluded. The rule actually applied is a
+   10%/90% band on the Recommend rate *computed after RT trimming*: keep
+   participants with `0.10 < p < 0.90`. The script verifies this reproduces the
+   382/43 split with zero misclassifications. Two consequences are reported and
+   both should go in the Methods:
+   - it is a proportion rule, not a count rule, so minority-response *counts*
+     overlap between kept and dropped (4 vs 7) even though proportions do not;
+   - because the proportion is computed post-trimming, inclusion is jointly
+     determined by the response profile and by which trials the RT filter
+     removed. Re-applying the same band to untrimmed trials flips 10 of 425
+     participants (2.4%). That interaction is worth disclosing.
+
+   It is *not* the case that trimming stripped minority responses until people
+   became degenerate: trimming removes a median of one minority response among
+   the dropped, none were strictly one-sided beforehand, and only 2 of 43 are
+   afterwards. The cut is a deliberate near-uniformity threshold.
+3. **Choice-profile breakdown** of every excluded participant, classified on the
+   same post-trimming rate the criterion used, so the "strong preferences"
+   hypothesis can be checked directly. Within the choice-profile tranche the
+   split is 21 near-always-reject vs 22 near-always-recommend.
+4. **Trait comparison**, analyzed vs excluded, on the measures whose scoring keys
+   reproduce the published composites exactly (GRiPS, Berlin numeracy, subjective
+   numeracy, BFI-2 domains, religiosity, spirituality, age): Welch tests, Hedges'
+   g with CIs, BH-FDR, Kolmogorov-Smirnov, and TOST equivalence tests against
+   d = 0.35. Also run separately for the choice-profile tranche and for
+   reject-side vs recommend-side within the excluded.
+5. **Response-style diagnostics** (acquiescence, within-person response
+   variability, Berlin accuracy, survey duration) that distinguish a substantive
+   trait difference from low-effort questionnaire responding.
+6. **Model-free robustness check.** Per-participant penalized logistic
+   regressions of choice on harm and cure probability, which stay estimable for
+   near-degenerate responders where the stDDM does not, letting the key trait
+   associations be re-run with the excluded participants added back in.
+7. **Threshold sensitivity.** The same regression bank re-fit at bands from
+   0.00/1.00 (keep everyone) through 0.20/0.80 (twice as strict as published),
+   showing whether the trait associations depend on where the cut was drawn.
+
+Note that section 4b of the script flags a scoring issue that is independent of
+the exclusion question: the published BFI-2 domain scores are plain item means
+taken without reverse-scoring, which leaves them dominated by acquiescence (mean
+inter-domain r = .80). The exclusion analysis reports results under both
+scorings, but the Big Five results in the manuscript rest on the unreversed
+scores and should be re-derived against the upstream cleaning pipeline.
 
 # Description of File Directories and Raw Data
 
@@ -137,5 +207,68 @@ The cleaned data frame (clean_data_long.csv) is a long format data frame contain
 - `no effect` -- the number indicating how likely it is that your treatment will cause no effect for treating the dysfunction
 
    
+## BFI-2 Scoring Correction
+
+The five BFI-2 domain columns (`Extraversion`, `Agreeableness`, `Conscientiousness`,
+`Neuroticism`, `Openness`) were originally stored as plain means over all twelve items
+of each domain, **with no reverse-scoring**. Each BFI-2 domain is balanced across
+forward- and reverse-worded items, so the reverse-worded items cancelled the
+forward-worded ones and what remained was largely acquiescent responding.
+
+Evidence, all reproducible from files in this repository:
+
+- Items in `data/raw_mturk_data/raw.csv` are raw 1-5 responses. Opposite-worded items
+  correlate negatively, e.g. r(`BIG5_1` "Is outgoing, sociable", `BIG5_16` "Tends to be
+  quiet") = -.42, while r(`BIG5_1`, `BIG5_46` "Is talkative") = +.67.
+- The stored columns reproduced `rowMeans()` over the unreversed items to machine
+  precision for all 382 analyzed participants.
+
+| | as stored | corrected |
+| --- | --- | --- |
+| Mean inter-domain r | +.68 | +.02 |
+| Cronbach's alpha | .62 - .70 | .79 - .88 |
+| Mean domain SD | 0.45 | 0.80 |
+
+`analysis/finalDDM/fix_bfi2_composites.R` recomputes the five columns in
+`data/FINAL_RT_EXCLUDED_DATA_20241014.RData` using the published key (Soto & John,
+2017; six of the twelve items reverse-worded in every domain). It asserts the
+pre-fix state before writing and copies the original to
+`data/FINAL_RT_EXCLUDED_DATA_20241014.PRE_BFI2_FIX.RData`. Note that `.RData` files
+are excluded by `.gitignore`, so this correction must be re-run against any local or
+archived copy of that file.
+
+### This does not change any manuscript result
+
+The composites are carried into `final_table` but never enter a reported analysis;
+they appear in neither `independent_vars` set in
+`analysis/finalDDM/DDM_STDDM_Regression.Rmd`. Every published Big Five result is
+item-level ridge importance -- `abs(coef(ridge_model)[-1])` with `standardize = TRUE`
+(line 536) -- and reverse-scoring an item flips the sign of its coefficient while
+leaving the magnitude unchanged. Verified directly on these items: maximum difference
+in importance between unreversed and correctly keyed inputs is 4e-16, with all 30
+reverse-keyed items flipping sign. The Agreeableness / `time` permutation result
+(FDR p = .039) is therefore unaffected.
+
+### Caveat for any signed or directional reuse
+
+Importance is sign-free, but **domain-averaged signed coefficients are not stable
+under this correction**. `melted_coefs` in `RidgeResults.RData` stores signed ridge
+beta weights; averaging them within a Big Five domain averages six correctly signed
+items against six inverted ones. Across the five domains and the `time` / `b_gain` /
+`b_risk` parameters, 7 of 15 such domain means change sign once the keying is
+corrected, and those that do not change sign can change substantially in magnitude
+(Agreeableness / `time`: -7.1e-5 as stored vs -9.3e-4 corrected). `melted_coefs` is
+written but never read by any script in this repository. Any directional claim about
+a Big Five domain should be re-derived from correctly keyed items rather than taken
+from a signed average over the stored ones. Objectively scored measures (Berlin
+Numeracy, scored correct/incorrect) are not affected.
+
+### Composite columns in the pilot CSVs
+
+The same unreversed composites also appear in five tracked pilot files:
+`data/Cleaned_Pilot/clean_data_long.csv`, `clean_data_longV2.csv`, `rawbeta.csv`,
+`withoutselfreportExlcusion.csv`, and `meancentered.csv` (mean inter-domain r = +.42
+to +.72). These are pilot data and are not corrected by the script above.
+
 ## Contact
 For any inquiries, please contact the corresponding author, John D. Medaglia, at [jdm383@drexel.edu](mailto:jdm383@drexel.edu).
