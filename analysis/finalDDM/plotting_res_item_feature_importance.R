@@ -88,6 +88,8 @@ measure_names <- c(
 get_category <- function(feature_name) {
   for(cat_name in names(category_mapping)) {
     patterns <- category_mapping[[cat_name]]
+    # Bare item names ("BIG5_1", "MFSQ1") must match exactly; unanchored, "BIG5_1" also matches BIG5_10-19
+    patterns <- ifelse(grepl("^[A-Za-z0-9_]+[0-9]$", patterns), paste0("^", patterns, "$"), patterns)
     if(any(sapply(patterns, function(p) grepl(p, feature_name)))) {
       return(cat_name)
     }

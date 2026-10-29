@@ -1,0 +1,7 @@
+"stage","n_excluded","n_remaining"
+"Recruited (as reported)",NA,616
+"Duplicate survey sessions collapsed to participant level",6,610
+"Prior-study criteria (Fernandez et al., 2025), applied upstream",185,425
+"Degenerate / near-degenerate choice profile",43,382
+"Dropped after DDM fit, reason not recoverable from the repo",6,376
+"Analyzed",NA,376

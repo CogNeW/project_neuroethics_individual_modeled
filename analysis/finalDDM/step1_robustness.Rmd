@@ -1,0 +1,224 @@
+---
+title: "Step 1 Robustness Analyses (Decision resubmission, editor point 2)"
+output: html_document
+---
+
+1. Participant bootstrap of ridge coefficients at the selected lambda: sign consistency per item
+   and per factor.
+2. Feature importance for non-decision time (theta), descriptively.
+3. Bootstrap CI on out-of-sample R² from the held-out predictions of nested CV (no refitting
+   inside the bootstrap).
+
+Inputs: `ridge_inputs.RData`, written by the "Save the ridge inputs" chunk of
+`DDM_STDDM_Regression.Rmd`. Run that notebook through that chunk first. Each section saves its
+own results to `step1_outputs/`, so later sections never refit.
+
+# Setup
+
+```{r}
+suppressMessages({
+  library(glmnet)
+  library(data.table)
+})
+
+base_dir <- "C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM"
+load(file.path(base_dir, "ridge_inputs.RData"))   # final_table, data_matrix, predictors, dependent_vars, ridge_lambdas, ...
+
+out_dir <- file.path(base_dir, "step1_outputs")
+dir.create(out_dir, showWarnings = FALSE)
+
+# Parameters predicted out of sample; the main text interprets only these.
+main_params <- c(time = "time", harm_sensitivity = "b_risk", nondecision_time = "theta")
+
+n_boot <- 1000
+
+# Same outcome scaling as the published ridge fits
+standardized_outcome <- function(param) as.numeric(scale(final_table[[param]]))
+```
+
+Sign conventions, so a positive coefficient can be read in words. s > 0 = left (harm) attribute
+enters before right (cure).
+
+```{r}
+for (p in main_params) {
+  cat(sprintf("%-7s mean = %+.3f, %% positive = %.1f\n",
+              p, mean(final_table[[p]]), 100 * mean(final_table[[p]] > 0)))
+}
+```
+
+# Factor Definitions
+
+Items belonging to each factor discussed in the main text, with keying. A factor-level
+coefficient is the sum of its item coefficients after flipping reverse-keyed items, so it reads
+as "higher on the trait". Without keying, BFI-2 items cancel: each domain is half reverse-worded.
+
+The published SNS key reverse-codes Q7 (Fagerlin et al., 2007), but SNS7 is treated as forward
+here. In the main collection it correlates positively with SNS6 (+.36) and SNS8 (+.30), unlike
+the pilot, and its ridge coefficients share the sign of the other SNS items. Set
+`sns7_reversed <- TRUE` to apply the published key instead.
+
+```{r}
+big5_reverse <- c(3, 4, 5, 8, 9, 11, 12, 16, 17, 22, 23, 24, 25, 26, 28, 29, 30,
+                  31, 36, 37, 42, 44, 45, 47, 48, 49, 50, 51, 55, 58)   # Soto & John (2017)
+big5_domain <- function(first) paste0("BIG5_", seq(first, 60, by = 5))
+
+factor_items <- list(
+  "Berlin Numeracy"        = paste0("Berlin", 1:4, "1"),   # dummy = answered correctly
+  "Subjective Numeracy"    = paste0("SNS", 1:8),
+  "GRiPS"                  = paste0("GRiPS_", 1:8),
+  "BIG5 Extraversion"      = big5_domain(1),
+  "BIG5 Agreeableness"     = big5_domain(2),
+  "BIG5 Conscientiousness" = big5_domain(3),
+  "BIG5 Neg. Emotionality" = big5_domain(4),
+  "BIG5 Open-Mindedness"   = big5_domain(5)
+)
+sns7_reversed <- FALSE
+reverse_keyed <- c(paste0("BIG5_", big5_reverse), if (sns7_reversed) "SNS7")
+
+missing <- setdiff(unlist(factor_items), colnames(data_matrix))
+if (length(missing)) stop("Not in data_matrix: ", paste(missing, collapse = ", "))
+
+item_keying <- setNames(rep(1, ncol(data_matrix)), colnames(data_matrix))
+item_keying[intersect(reverse_keyed, names(item_keying))] <- -1
+
+factor_coefs <- function(coef_mat) {
+  # coef_mat: rows = fits, cols = items. Returns rows = fits, cols = factors.
+  sapply(factor_items, function(items) {
+    coef_mat[, items, drop = FALSE] %*% item_keying[items]
+  })
+}
+```
+
+# 1. Participant Bootstrap of Ridge Coefficients
+
+Resample participants with replacement, refit at the published lambda, keep every coefficient.
+Direction claims rest on these sign proportions.
+
+```{r}
+bootstrap_coefs <- function(param, n_boot) {
+  y <- standardized_outcome(param)
+  lambda <- ridge_lambdas[[param]]
+  t(replicate(n_boot, {
+    idx <- sample(nrow(data_matrix), replace = TRUE)
+    fit <- glmnet(data_matrix[idx, ], y[idx], alpha = 0, lambda = lambda)
+    as.vector(coef(fit))[-1]
+  }))
+}
+
+set.seed(2026)
+boot_coefs <- lapply(main_params, function(p) {
+  m <- bootstrap_coefs(p, n_boot)
+  colnames(m) <- colnames(data_matrix)
+  m
+})
+save(boot_coefs, file = file.path(out_dir, "boot_coefs.RData"))
+```
+
+## 1a. Sign Consistency Summaries
+
+```{r}
+full_sample_coefs <- function(param) {
+  fit <- glmnet(data_matrix, standardized_outcome(param), alpha = 0,
+                lambda = ridge_lambdas[[param]])
+  setNames(as.vector(coef(fit))[-1], colnames(data_matrix))
+}
+
+sign_summary <- function(coef_mat, full) {
+  data.table(
+    term        = colnames(coef_mat),
+    estimate    = full,
+    boot_median = apply(coef_mat, 2, median),
+    ci_low      = apply(coef_mat, 2, quantile, 0.025),
+    ci_high     = apply(coef_mat, 2, quantile, 0.975),
+    sign_agree  = colMeans(sign(coef_mat) == sign(rep(full, each = nrow(coef_mat))))
+  )
+}
+
+item_signs <- rbindlist(lapply(names(main_params), function(nm) {
+  full <- full_sample_coefs(main_params[[nm]])
+  cbind(parameter = nm, sign_summary(boot_coefs[[nm]], full))
+}))
+
+factor_signs <- rbindlist(lapply(names(main_params), function(nm) {
+  full <- factor_coefs(matrix(full_sample_coefs(main_params[[nm]]), nrow = 1,
+                              dimnames = list(NULL, colnames(data_matrix))))
+  cbind(parameter = nm, sign_summary(factor_coefs(boot_coefs[[nm]]), as.vector(full)))
+}))
+
+fwrite(item_signs,   file.path(out_dir, "sign_consistency_items.csv"))
+fwrite(factor_signs, file.path(out_dir, "sign_consistency_factors.csv"))
+print(factor_signs[, lapply(.SD, function(v) if (is.numeric(v)) signif(v, 3) else v)])
+```
+
+# 2. Feature Importance for Non-Decision Time
+
+The published pipeline already computed this (`importance_results$theta`) but it was never
+reported. Summarize it the same way as the other parameters.
+
+```{r}
+theta_importance <- as.data.table(importance_results$theta)
+item_to_factor <- setNames(rep(names(factor_items), lengths(factor_items)), unlist(factor_items))
+theta_importance[, factor := item_to_factor[Feature]]   # NA = item outside the main-text factors
+fwrite(theta_importance, file.path(out_dir, "theta_feature_importance.csv"))
+print(head(theta_importance, 15))
+```
+
+# 3. Held-Out Predictions from Nested CV
+
+Same procedure as the published nested CV (10 outer x 10 inner folds, 10 repeats) but the
+held-out predictions are kept. This is the slow chunk.
+
+```{r}
+nested_cv_predictions <- function(x, y, n_folds = 10) {
+  outer_folds <- sample(rep(seq_len(n_folds), length.out = length(y)))
+  pred <- numeric(length(y))
+  for (k in seq_len(n_folds)) {
+    test <- outer_folds == k
+    inner_fit <- cv.glmnet(x[!test, , drop = FALSE], y[!test], alpha = 0)
+    pred[test] <- predict(inner_fit, newx = x[test, , drop = FALSE], s = "lambda.min")
+  }
+  pred
+}
+
+r2 <- function(y, pred) 1 - sum((y - pred)^2) / sum((y - mean(y))^2)
+
+n_repeats <- 10
+set.seed(1234)
+heldout_preds <- lapply(main_params, function(p) {
+  y <- standardized_outcome(p)
+  list(y = y, preds = replicate(n_repeats, nested_cv_predictions(data_matrix, y)))
+})
+save(heldout_preds, file = file.path(out_dir, "heldout_preds.RData"))
+```
+
+## 3a. Bootstrap CI on Out-of-Sample R²
+
+Resample participants from the held-out predictions and recompute R². This captures sampling
+variability of the evaluation set, not of the model fitting; fold-partition variability is the
+10-repeat range reported alongside.
+
+```{r}
+bootstrap_r2 <- function(y, preds, n_boot) {
+  replicate(n_boot, {
+    idx <- sample(length(y), replace = TRUE)
+    mean(apply(preds[idx, , drop = FALSE], 2, function(p) r2(y[idx], p)))
+  })
+}
+
+set.seed(2026)
+r2_table <- rbindlist(lapply(names(main_params), function(nm) {
+  h <- heldout_preds[[nm]]
+  repeat_r2 <- apply(h$preds, 2, function(p) r2(h$y, p))
+  boot <- bootstrap_r2(h$y, h$preds, n_boot)
+  data.table(parameter   = nm,
+             R2          = mean(repeat_r2),
+             repeat_min  = min(repeat_r2),
+             repeat_max  = max(repeat_r2),
+             ci_low      = quantile(boot, 0.025),
+             ci_high     = quantile(boot, 0.975),
+             p_boot_le_0 = mean(boot <= 0))
+}))
+
+fwrite(r2_table, file.path(out_dir, "r2_bootstrap_ci.csv"))
+print(r2_table[, lapply(.SD, function(v) if (is.numeric(v)) round(100 * v, 2) else v)])
+```

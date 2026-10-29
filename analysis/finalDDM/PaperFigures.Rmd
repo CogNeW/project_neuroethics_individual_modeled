@@ -8,18 +8,51 @@ date: "2024-09-30"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-For the results portion, we should also report the DIC values.
+## Model comparison (M0 = no time effect, M1 = with time effect)
 
-M0 (without time effect)
-DIC: 51833.97
-WAIC: 55526.92 (SE: 351.70)
-LOO: 56106.64 (SE: 357.57)
+**Headline result -- report this pair.** From
+`loo_compare()` in `kim_analysis_stddm.R` (saved to
+`model_comparison_indices.RData`):
 
-M1 (with time effect)
+| quantity | value |
+|---|---|
+| elpd_diff (M0 vs M1) | -137.60 |
+| se_diff | 18.15 |
 
-DIC: 51644.23
-WAIC: 55261.85 (SE: 354.88)
-LOO: 55831.44 (SE: 360.99)
+`elpd_diff` and `se_diff` are on the **elpd** scale. The absolute WAIC/LOOIC
+below are on the **-2 x elpd** scale; do not place `se_diff` next to a
+difference of those. Do not report the absolute SEs (~350) as the uncertainty
+of the comparison: they describe variability of each model's total across all
+trials, whereas `se_diff` comes from the pointwise elpd contrasts on the same
+observations, where the two models' errors are highly correlated.
+
+This is **trial-level** LOO (`ld_comp` is per-trial), i.e. held-out trial
+prediction, not leave-one-participant-out.
+
+M1 is favoured by **7.6 standard errors** (137.60 / 18.15), so the comparison
+is decisive rather than marginal.
+
+**Pareto k diagnostics:** 262 / 25,975 trials (1.0%) exceed k = 0.7 under M0
+and 269 / 25,975 (1.1%) under M1. The counts are near-identical across models,
+so the induced bias largely cancels in the difference, and 262 unreliable
+points cannot move a 7.6-SE gap. PSIS-LOO is reliable here.
+
+Note that WAIC flagged far *more* problem observations than PSIS-LOO did
+(1,885 trials, 7.3%, with p_waic > 0.4 under M0; 1,855, 7.1%, under M1).
+WAIC is therefore not a safer fallback than LOO on these data -- it degrades
+harder on the same trials. LOO is the primary index; WAIC and DIC are
+secondary.
+
+**Absolute values (secondary; SEs are of each total, not of the difference):**
+
+| model | DIC | WAIC (SE) | LOOIC (SE) |
+|---|---|---|---|
+| M0 (no time effect) | 51833.97 | 55526.92 (351.70) | 56106.64 (357.57) |
+| M1 (with time effect) | 51644.23 | 55261.85 (354.88) | 55831.44 (360.99) |
+
+DIC here is the hand-computed variant in `calculate_indices()` using
+`D_hat = min(deviance)`, which is chain-length dependent -- treat it as the
+weakest of the three.
 
 ```{r}
 library(tidyverse)
@@ -44,8 +77,13 @@ load("C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classe
 behavior_path <- "C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/data/FINAL_RT_EXCLUDED_DATA_20241014.RData"
 load(behavior_path)
 
-behavior_path <- "C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM/participant_responses_20241216.RData"
-load(behavior_path)
+# NOTE: participant_responses_20241216.RData holds risk_data with the preprocessing
+# below ALREADY applied (rt in seconds; RT/response/idxP present; risk/gain/no_effect
+# as proportions). Loading it here overwrote the raw data from FINAL_RT_EXCLUDED_DATA,
+# and the mutate() below then ran a second time -- dividing rt by 1000 again. That is
+# why the observed density in Figure 1 was flat at zero. Preprocess exactly once.
+# behavior_path <- "C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM/participant_responses_20241216.RData"
+# load(behavior_path)
 
 final_participant_path <- "C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM/FINAL_PARTICIPANT_LIST.RData"
 load(final_participant_path)
@@ -62,8 +100,13 @@ risk_data <- risk_data %>%
     idxP = as.numeric(as.factor(user_id)) # Create numeric subject index
   ) 
 
+# m0_predictions / m1_predictions have one row per RAW trial (25975), in the same
+# order as risk_data BEFORE this exclusion. Keep the mask so those matrices can be
+# subset identically downstream (see the Figure 2 chunk); filtering risk_data alone
+# leaves it at 25563 rows and misaligns it against the 25975-row prediction matrices.
+keep_rows <- risk_data$idxP %in% unique_idxP_table$idxP
 risk_data <- risk_data %>%
-  filter(idxP %in% unique_idxP_table$idxP)
+  filter(keep_rows)
 ```
 
 
@@ -276,7 +319,7 @@ create_comparison_plot_choice <- function(observed_data, predicted_data, x_var, 
 
 ```{r}
 # Calculate the row averages of m0_predictions
-row_averages <- rowMeans(m0_predictions)
+row_averages <- rowMeans(m0_predictions)[keep_rows]
 
 # Create the new m0_choice_predictions table
 m0_choice_predictions <- risk_data %>%
@@ -286,7 +329,7 @@ m0_choice_predictions <- risk_data %>%
   )
 
 # Calculate the row averages of m0_predictions
-row_averages <- rowMeans(m1_predictions)
+row_averages <- rowMeans(m1_predictions)[keep_rows]
 
 # Create the new m0_choice_predictions table
 m1_choice_predictions <- risk_data %>%
@@ -424,6 +467,12 @@ ggsave("Figures/Fig2_GAIN_RISK_COMPARISON.png", fig2_plot, width = 16, height = 
 I'm using T values instead of beta coefficients, since these are standardized
 
 ```{r}
+# `results` and `subscore_results` are not saved anywhere usable: they are built by
+# DDM_STDDM_Regression.Rmd (the regression chunks near the end) and the .RData on
+# disk predates the T_Value column. Run that notebook's save chunk once to create
+# this file, then this load makes Figure 3 reproducible from a clean session.
+load('regression_results_for_figures.RData')
+
 # Create a wide format of the results data for t values
 t_wide <- dcast(results, Independent_Var ~ Dependent_Var, value.var = "T_Value")
 
@@ -673,7 +722,8 @@ risk_data_avg <- risk_data %>%
 
 # Step 2: Join the risk_data_avg with averages_wide by idxP and participant_id
 participant_average <- risk_data_avg %>%
-  left_join(averages_wide, by = c("idxP" = "participant_id"))
+  left_join(averages_wide, by = c("
+idxP" = "participant_id"))
 
 # Step 3: (Optional) View the final data
 head(participant_average)
@@ -705,7 +755,7 @@ participant_average <- participant_average %>%
 participant_average <- participant_average %>%
   group_by(b_diff_group) %>%
   mutate(time_group = cut(time, breaks = quantile(time, probs = seq(0, 1, 0.2), na.rm = TRUE), 
-                          labels = c("1st \n(Benefits First)", "2nd", "3rd", "4th", "5th \n(Risks First)"), include.lowest = TRUE))
+                          labels = c("1st \n(Cure earlier)", "2nd", "3rd", "4th", "5th \n(Harm earlier)"), include.lowest = TRUE))
 
 
 # Step 3: Calculate the average and confidence intervals for avg_response in each b_gain and time quintile
@@ -723,8 +773,8 @@ fig4_plot <- ggplot(summary_data, aes(x = time_group, y = avg_response_mean, col
   geom_point() +
   geom_errorbar(aes(ymin = avg_response_ci_lower, ymax = avg_response_ci_upper), width = 0.1) +  # Add error bars
   geom_vline(xintercept = 0, linetype = "dashed", color = "black", size = 2) +  # Add dashed vertical line for zero
-  labs(x = "Latency Quintiles", color = "Benefit Sensitivity") +
-  ggtitle("Grouped by Benefit Sensitivity") +  # Add title
+  labs(x = "Relative Onset Quintiles",color = "Cure Sensitivity") +
+  ggtitle("Grouped by Cure Sensitivity") +  # Add title
   theme_minimal(base_family = "arial") +  # Change font to serif
   theme(
     legend.position = "right",
@@ -776,7 +826,7 @@ participant_average <- participant_average %>%
 participant_average <- participant_average %>%
   group_by(b_diff_group) %>%
   mutate(time_group = cut(time, breaks = quantile(time, probs = seq(0, 1, 0.2), na.rm = TRUE), 
-                          labels = c("1st \n(Benefits First)", "2nd", "3rd", "4th", "5th \n(Risks First)"), include.lowest = TRUE))
+                          labels = c("1st \n(Cure earlier)", "2nd", "3rd", "4th", "5th \n(Harm earlier)"), include.lowest = TRUE))
 
 
 # Step 3: Calculate the average and confidence intervals for avg_response in each b_gain and time quintile
@@ -797,8 +847,8 @@ fig4_plot <- ggplot(summary_data, aes(x = time_group, y = avg_response_mean, col
   geom_point() +
   geom_errorbar(aes(ymin = avg_response_ci_lower, ymax = avg_response_ci_upper), width = 0.1) +  # Add error bars
   geom_vline(xintercept = 0, linetype = "dashed", color = "black", size = 2) +  # Add dashed vertical line for zero
-  labs(x = "Latency Quintiles", y = "Average Probability of\nEndorsing Treatment", color = "Risk Sensitivity") +
-  ggtitle("Grouped by Risk Sensitivity") +  # Add title
+  labs(x = "Relative Onset Quintiles",y = "Average Probability of\nEndorsing Treatment", color = "Harm Sensitivity") +
+  ggtitle("Grouped by Harm Sensitivity") +  # Add title
   theme_minimal(base_family = "arial") +  # Change font to serif
   theme(
     legend.position = "right",
@@ -850,7 +900,7 @@ participant_average <- participant_average %>%
 participant_average <- participant_average %>%
   group_by(b_diff_group) %>%
   mutate(time_group = cut(time, breaks = quantile(time, probs = seq(0, 1, 0.2), na.rm = TRUE), 
-                          labels = c("1st \n(Benefits First)", "2nd", "3rd", "4th", "5th \n(Risks First)"), include.lowest = TRUE))
+                          labels = c("1st \n(Cure earlier)", "2nd", "3rd", "4th", "5th \n(Harm earlier)"), include.lowest = TRUE))
 
 
 # Step 3: Calculate the average and confidence intervals for avg_response in each b_gain and time quintile
@@ -868,7 +918,7 @@ fig4_plot <- ggplot(summary_data, aes(x = time_group, y = avg_response_mean, col
   geom_point() +
   geom_errorbar(aes(ymin = avg_response_ci_lower, ymax = avg_response_ci_upper), width = 0.1) +  # Add error bars
   geom_vline(xintercept = 0, linetype = "dashed", color = "black", size = 2) +  # Add dashed vertical line for zero
-  labs(x = "Latency Quintiles", color = "Overall sensitivity") +
+  labs(x = "Relative Onset Quintiles",color = "Overall sensitivity") +
   ggtitle("Grouped by Overall Sensitivity") +  # Add title
   theme_minimal(base_family = "serif") +  # Change font to serif
   theme(
@@ -906,8 +956,17 @@ Right is benefit comes first
 
 ## Large Factor Labels
 
+> Defines the 12 overarching categories and the hand-picked palette used by the
+> published figures. Run this chunk, then 'Draw Plot'. Do NOT also run
+> 'Factor Cluster Labels' below -- it overwrites all three objects defined here.
+
 ```{r}
 library(dplyr)
+# importance_results for the item-level plots; written by DDM_STDDM_Regression.Rmd.
+# Loaded into its own environment so final_table etc. in this session are not overwritten.
+ridge_env <- new.env()
+load("ridge_inputs.RData", envir = ridge_env)
+importance_results <- ridge_env$importance_results
 category_colors <- c(
   "BIG5" = "#808080",
   "Moral Foundations (MFQ)" = "#009E73",
@@ -957,6 +1016,8 @@ measure_names <- c(
 get_category <- function(feature_name) {
   for(cat_name in names(category_mapping)) {
     patterns <- category_mapping[[cat_name]]
+    # Bare item names ("BIG5_1", "MFSQ1") must match exactly; unanchored, "BIG5_1" also matches BIG5_10-19
+    patterns <- ifelse(grepl("^[A-Za-z0-9_]+[0-9]$", patterns), paste0("^", patterns, "$"), patterns)
     if(any(sapply(patterns, function(p) grepl(p, feature_name)))) {
       return(cat_name)
     }
@@ -966,6 +1027,14 @@ get_category <- function(feature_name) {
 ```
 
 ## Factor Cluster Labels
+
+> ALTERNATIVE TO 'Large Factor Labels' ABOVE -- RUN ONE OR THE OTHER, NOT BOTH.
+> This chunk redefines `category_mapping`, `get_category` AND `category_colors`, so
+> whichever of the two chunks ran last wins. It splits BIG5 into 5 facets, MFQ into 6,
+> IRI into 4 and Schwartz into 10, giving ~36 sub-category legend entries coloured by a
+> jet ramp. The published Figure 4/5 use the 12 overarching categories from the chunk
+> above. If your legend shows sub-categories, you ran this chunk -- re-run
+> 'Large Factor Labels' and then 'Draw Plot'.
 
 Drawing the feature importance at the item levels doesn't provide too much.
 
@@ -984,7 +1053,6 @@ category_mapping <- list(
   "Moral Foundations - Loyalty" = c("MFSQ3", "MFSQ9", "MFSQ14", "MFSQ19", "MFSQ25", "MFSQ30"),
   "Moral Foundations - Authority" = c("MFSQ4", "MFSQ10", "MFSQ15", "MFSQ20", "MFSQ26", "MFSQ31"),
   "Moral Foundations - Purity" = c("MFSQ5", "MFSQ11", "MFSQ16", "MFSQ21", "MFSQ27", "MFSQ32"),
-  "Moral Foundations - Unclassified" = c("MFSQ6", "MFSQ22"),
   "Religious & Spiritual" = c("^Religion", "^AttendChurch", "Spirituality", "Religiosity", "^ReligiousActivity", "meditation"),
   "Risk Taking (GRiPS)" = "^GRiPS_",
   "Interpersonal Reactivity - Perspective Taking" = "^PT", 
@@ -1024,6 +1092,8 @@ measure_names <- c(
 get_category <- function(feature_name) {
   for(cat_name in names(category_mapping)) {
     patterns <- category_mapping[[cat_name]]
+    # Bare item names ("BIG5_1", "MFSQ1") must match exactly; unanchored, "BIG5_1" also matches BIG5_10-19
+    patterns <- ifelse(grepl("^[A-Za-z0-9_]+[0-9]$", patterns), paste0("^", patterns, "$"), patterns)
     if(any(sapply(patterns, function(p) grepl(p, feature_name)))) {
       return(cat_name)
     }
@@ -1032,6 +1102,10 @@ get_category <- function(feature_name) {
 }
 
 library(grDevices)
+
+# `categories` is the vector of category labels the palette is built over; it is the
+# names of category_mapping, which it was renamed from.
+categories <- names(category_mapping)
 
 # Define a custom jet-like color palette
 jet_colors <- colorRampPalette(c("blue", "cyan", "yellow", "red"))(length(categories))
@@ -1051,18 +1125,70 @@ library(ggtext)
 
 measure_names <- c(
   "time" = "Time",
-  "b_gain" = "Gain Sensitivity",
-  "b_risk" = "Risk Sensitivity",
+  "b_gain" = "Cure Sensitivity",
+  "b_risk" = "Harm Sensitivity",
   "alpha" = "Response Caution",
-  "theta" = "Tau",
-  "bias" = "Z"
+  "theta" = "Non-Decision Time",
+  "bias" = "Bias"
+)
+
+# Short descriptions for the inset items (text from data/text_key.csv). BFI-2 domain in
+# parentheses: O, C, E, A, N (negative emotionality); "rev." = reverse-keyed item.
+# Berlin dummies (e.g. Berlin31) = that problem answered correctly. Items not listed
+# here keep their code, so a change in the top 10 shows up as a raw code.
+item_labels <- c(
+  "Berlin11"       = "Choir problem (correct)",
+  "Berlin21"       = "Five-sided die (correct)",
+  "Berlin31"       = "Loaded die (correct)",
+  "SNS6"           = "Prefers numbers to words",
+  "GRiPS_4"        = "Takes risks even if hurt",
+  "GRiPS_7"        = "Believer in taking chances",
+  "GRiPS_8"        = "Attracted by risk",
+  "Spirituality"   = "How spiritual",
+  "Religiosity"    = "How religious",
+  "HumanMindSouls" = "Minds are like souls",
+  "MFSQ18"         = "Laws should treat all fairly",
+  "PD7"            = "Goes to pieces in emergencies",
+  "BIG5_7"         = "Respectful (A)",
+  "BIG5_11"        = "Rarely excited (E, rev.)",
+  "BIG5_14"        = "Moody (N)",
+  "BIG5_22"        = "Starts arguments (A, rev.)",
+  "BIG5_30"        = "Little creativity (O, rev.)",
+  "BIG5_44"        = "Controls emotions (N, rev.)",
+  "BIG5_45"        = "Hard to imagine things (O, rev.)",
+  "BIG5_47"        = "Cold, uncaring (A, rev.)",
+  "BIG5_48"        = "Leaves a mess (C, rev.)",
+  "BIG5_49"        = "Rarely anxious (N, rev.)",
+  "BIG5_51"        = "Lets others take charge (E, rev.)",
+  "BIG5_58"        = "Behaves irresponsibly (C, rev.)",
+  # Supplementary parameters (cure sensitivity, response caution, bias)
+  "BIG5_10"        = "Curious (O)",
+  "BIG5_13"        = "Dependable (C)",
+  "BIG5_15"        = "Inventive (O)",
+  "BIG5_20"        = "Fascinated by art (O)",
+  "BIG5_38"        = "Efficient (C)",
+  "BIG5_40"        = "Deep thinker (O)",
+  "BIG5_60"        = "Original (O)",
+  "SNS1"           = "Good with fractions",
+  "SNS2"           = "Good with percentages",
+  "SNS3"           = "Can calculate a 15% tip",
+  "SNS4"           = "Can calculate 25% off",
+  "MFSQ2"          = "Treated differently (fairness)",
+  "MFSQ8"          = "Acted unfairly (fairness)",
+  "FS1"            = "Daydreams, fantasizes",
+  "FS2"            = "Involved with characters in novels",
+  "educationUndergraduate" = "Education: undergraduate",
+  # Coding inferred from response frequencies (0 = never permissible, 1 = permissible if net
+  # good, 2 = obligatory if net good); dummy is relative to the deontological response
+  "MC_Lying1"      = "Lying OK if net good"
 )
 
 create_importance_plot <- function(data, measure) {
-  
+
   data_plt <- data %>%
     mutate(
       Category = sapply(Feature, get_category),
+      Label = ifelse(Feature %in% names(item_labels), item_labels[Feature], Feature),
       StdError = StdError,
       Importance = Importance
     ) %>%
@@ -1116,9 +1242,9 @@ create_importance_plot <- function(data, measure) {
   main_plot + 
     annotation_custom(
       ggplotGrob(
-        ggplot(top_10_data, 
-               aes(x = Importance, 
-                   y = reorder(Feature, Importance),
+        ggplot(top_10_data,
+               aes(x = Importance,
+                   y = reorder(Label, Importance),
                    fill = Category)) +
           geom_bar(stat = "identity", width = 1) +
           scale_fill_manual(values = category_colors, drop = FALSE) +
@@ -1130,7 +1256,9 @@ create_importance_plot <- function(data, measure) {
           theme(
             text = element_text(family = "Arial", size = 24),          # to increased size
             axis.text.y = element_text(size = 32, face="bold"),                         # to increased size y-axis text
-            axis.text.x = element_text(size = 32),                         # to increased size x-axis text
+            # Inset shares the main panel's x scale, so its own tick labels are dropped
+            axis.text.x = element_blank(),
+            axis.ticks.x = element_blank(),
             legend.position = "none",
             panel.grid = element_blank(),
             plot.title = element_blank(),
@@ -1138,24 +1266,25 @@ create_importance_plot <- function(data, measure) {
             panel.border = element_rect(color = "black", fill = NA, size = 1.5)  # to increased size border
           )
       ),
-      xmin = quantile(data_plt$Importance, 0.6),
+      # Start just past the longest main-plot bar in the inset's rows (ranks 5-135 from the
+      # bottom), so the inset never covers a bar
+      xmin = sort(data_plt$Importance)[135] * 1.05,
       xmax = (quantile(data_plt$Importance, 1) - quantile(data_plt$Importance, 0.5)) * .9 + quantile(data_plt$Importance, 0.5),
       ymin = 5,
       ymax = 135
     )
 }
 
-# Create plots for each measure
-measures <- c("b_gain", "b_risk", "time", "alpha")
+# Main text: only the parameters predicted out of sample (harm sensitivity, time,
+# non-decision time), 2x2 with the shared legend in the fourth slot
+measures <- c("b_risk", "time", "theta")
 plots <- lapply(measures, function(measure) {
   create_importance_plot(importance_results[[measure]], measure)
 })
 
-# Combine plots with a single legend
-combined_plot <- wrap_plots(plots, ncol = 2) +
+combined_plot <- wrap_plots(c(plots, list(guide_area())), ncol = 2) +
   plot_layout(guides = "collect") &
   theme(
-    legend.position = "right",
     plot.tag = element_text(size = 24, face = "bold")  # Control tag appearance here
   )
 
@@ -1167,20 +1296,63 @@ ggsave(
   height = 32,
   dpi = 300
 )
+# Vector copy for submission (sharp at any zoom); cairo_pdf embeds Arial
+ggsave(
+  filename = "Figures/feature_importance_final.pdf",
+  plot = combined_plot,
+  width = 32,
+  height = 32,
+  device = cairo_pdf
+)
 
 # Display combined plot
 print(combined_plot)
+```
+
+## Supplementary Figure: Feature Importance for Non-Predicted Parameters
+
+Same layout as Figure 4 for cure sensitivity, response caution, and bias, which were not
+predicted out of sample. Uses `create_importance_plot` and `item_labels` from "Draw Plot".
+
+```{r}
+supp_importance_measures <- c("b_gain", "alpha", "bias")
+supp_importance_plots <- lapply(supp_importance_measures, function(measure) {
+  create_importance_plot(importance_results[[measure]], measure)
+})
+
+supp_importance_plot <- wrap_plots(c(supp_importance_plots, list(guide_area())), ncol = 2) +
+  plot_layout(guides = "collect")
+
+ggsave("Figures/Supp_feature_importance.png", supp_importance_plot, width = 32, height = 32, dpi = 300)
+ggsave("Figures/Supp_feature_importance.pdf", supp_importance_plot, width = 32, height = 32,
+       device = cairo_pdf)
+print(supp_importance_plot)
 ```
 
 
 # Figure 6 (Permutation Test)
 
 ```{r}
+# The permutation-test objects are not created anywhere in this notebook, so they must
+# be loaded. IMPORTANT: `results` below is the permutation LIST (one data.frame per DDM
+# parameter, with Category / P_Value columns) -- NOT the regression `results` data.frame
+# built in DDM_STDDM_Regression.Rmd. If that one is in the session it shadows this, and
+# results[[<measure>]] silently returns NULL ('argument is of length zero').
+#
+# permutation_test_test_level.RData  -> 12 OVERARCHING categories (published Figure 6)
+# permutation_test_factor_level.RData -> 43 sub-categories (BIG5 - Extraversion, ...)
+# Both store the object under the name final_factor_results.
+perm_env <- new.env()
+load('permutation_test_test_level.RData', envir = perm_env)
+perm_results         <- perm_env$final_factor_results
+final_factor_results <- perm_env$final_factor_results
+final_results        <- perm_env$final_factor_results
+
 # Loop through each category in results and filter significant p-values
 significant_results <- list()
 measures <- c("time", "b_gain", "b_risk", "alpha", "theta", "bias")
 for (category in measures) {
-  df <- results[[category]]  # Extract dataframe for the category
+  df <- perm_results[[category]]  # Extract dataframe for the category
   
   # Filter rows where P_Value is significant
   sig_df <- df[df$P_Value > 0.95 | df$P_Value < 0.05, ]
@@ -1221,10 +1393,10 @@ final_factor_results <- lapply(final_factor_results, compute_fdr_p_values)
 measures <- c("time", "b_gain", "b_risk", "alpha", "theta", "bias")
 measure_labels <- c(
   "time" = "Time",
-  "b_gain" = "Gain Sensitivity",
-  "b_risk" = "Risk Sensitivity",
+  "b_gain" = "Cure Sensitivity",
+  "b_risk" = "Harm Sensitivity",
   "alpha" = "Response Caution",
-  "theta" = "Non-decision Time",
+  "theta" = "Non-Decision Time",
   "bias" = "Bias"
 )
 
@@ -1287,6 +1459,107 @@ for (category in measures) {
   plot_permutation_test(category, final_results[[category]])
 }
 
+```
+
+## Combined Figure 5 (main text)
+
+Harm sensitivity and time on top, non-decision time centered below; the legend is in the
+caption. Stars come from the FDR-corrected permutation p-values (within each parameter,
+corrected separately for higher- and lower-than-chance importance), so they always match the
+results. The single panels above stay as the supplementary version with all six parameters.
+
+```{r}
+library(ggplot2)
+library(patchwork)
+
+# P_Value = share of the null distribution at or below the observed mean, so values near 1
+# mean higher-than-chance importance and values near 0 lower-than-chance
+add_fdr_stars <- function(df) {
+  df$q_high <- p.adjust(1 - df$P_Value, method = "fdr")
+  df$q_low  <- p.adjust(df$P_Value, method = "fdr")
+  df$Significance <- ifelse(df$q_high < .05 | df$q_low < .05, "*", "")
+  df
+}
+
+make_permutation_panel <- function(measure, df) {
+  df <- add_fdr_stars(df)
+  null_dist_long <- do.call(rbind, lapply(seq_len(nrow(df)), function(i) {
+    data.frame(Category = df$Category[i], Value = as.numeric(unlist(df$Null_Distribution[i])))
+  }))
+  # Star sits just above the higher of the violin top and the error bar
+  null_max <- tapply(null_dist_long$Value, null_dist_long$Category, max)
+  df$star_y <- pmax(null_max[df$Category], df$test_mean + df$test_sd) * 1.08
+
+  ggplot(null_dist_long, aes(x = Category, y = Value)) +
+    geom_violin(fill = "lightblue", color = "black", alpha = 0.7) +
+    geom_errorbar(data = df, aes(x = Category, y = test_mean,
+                                 ymin = test_mean - test_sd, ymax = test_mean + test_sd),
+                  width = 0.2, color = "red", linewidth = 1) +
+    geom_point(data = df, aes(x = Category, y = test_mean), color = "red", size = 3) +
+    geom_text(data = df, aes(x = Category, y = star_y, label = Significance),
+              size = 20, fontface = "bold") +
+    theme_classic(base_family = "Arial") +
+    labs(title = measure_labels[[measure]], x = "Category", y = "Feature\nImportance") +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 36),
+      axis.text.y = element_text(size = 32),
+      axis.title.x = element_text(size = 44, face = "bold"),
+      axis.title.y = element_text(size = 44, face = "bold", margin = margin(r = 25)),
+      plot.title = element_text(size = 56, face = "bold", hjust = 0.5),
+      plot.margin = margin(10, 40, 20, 40)
+    )
+}
+
+fig5_measures <- c("b_risk", "time", "theta")
+fig5_panels <- lapply(fig5_measures, function(m) make_permutation_panel(m, final_results[[m]]))
+
+# Two panels on top, the third centered below at the same size. The bottom row is built
+# on its own (spacer | panel | spacer, widths 1:2:1) so the panel takes exactly half the
+# row like each top panel; a shared grid would also give it the gutter between columns.
+fig5_top    <- fig5_panels[[1]] | fig5_panels[[2]]
+fig5_bottom <- (plot_spacer() | fig5_panels[[3]] | plot_spacer()) +
+  plot_layout(widths = c(1, 2, 1))
+fig5_plot <- (fig5_top / fig5_bottom) +
+  plot_layout(heights = c(1, 1))   # both rows the same height
+
+ggsave("Figures/permutation_test_final.png", fig5_plot, width = 34, height = 24, dpi = 300)
+ggsave("Figures/permutation_test_final.pdf", fig5_plot, width = 34, height = 24, device = cairo_pdf)
+print(fig5_plot)
+
+# Starred categories, for checking against the text
+for (m in fig5_measures) {
+  d <- add_fdr_stars(final_results[[m]])
+  cat(sprintf("%-7s high: %s | low: %s\n", m,
+              paste(d$Category[d$q_high < .05], collapse = ", "),
+              paste(d$Category[d$q_low < .05], collapse = ", ")))
+}
+```
+
+## Supplementary Figure: Permutation Tests for Non-Predicted Parameters
+
+Same layout and FDR stars as Figure 5 for cure sensitivity, response caution, and bias. These
+describe the structure of the fitted coefficients, not trait prediction, since none of the three
+was predicted out of sample. Uses `make_permutation_panel` and `add_fdr_stars` from the chunk above.
+
+```{r}
+supp_perm_measures <- c("b_gain", "alpha", "bias")
+supp_perm_panels <- lapply(supp_perm_measures, function(m) make_permutation_panel(m, final_results[[m]]))
+
+supp_perm_plot <- ((supp_perm_panels[[1]] | supp_perm_panels[[2]]) /
+                   ((plot_spacer() | supp_perm_panels[[3]] | plot_spacer()) +
+                      plot_layout(widths = c(1, 2, 1)))) +
+  plot_layout(heights = c(1, 1))
+
+ggsave("Figures/Supp_permutation_test.png", supp_perm_plot, width = 34, height = 24, dpi = 300)
+ggsave("Figures/Supp_permutation_test.pdf", supp_perm_plot, width = 34, height = 24, device = cairo_pdf)
+print(supp_perm_plot)
+
+for (m in supp_perm_measures) {
+  d <- add_fdr_stars(final_results[[m]])
+  cat(sprintf("%-7s high: %s | low: %s\n", m,
+              paste(d$Category[d$q_high < .05], collapse = ", "),
+              paste(d$Category[d$q_low < .05], collapse = ", ")))
+}
 ```
 # Discussion Analysis
 

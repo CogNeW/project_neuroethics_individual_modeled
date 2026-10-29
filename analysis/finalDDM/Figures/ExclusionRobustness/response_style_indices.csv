@@ -1,0 +1,611 @@
+"user_id","acquiescence","within_sd","duration_s","group","stage","BerlinScore"
+"06BFVmlE",3.51666666666667,1.55674221619497,748,"Analyzed","Analyzed",1
+"09TEU6Y6",3.2,1.78316040135181,2341,"Analyzed","Analyzed",0
+"0CG3to3l",3.05,1.21327404089311,1084,"Analyzed","Analyzed",2
+"0S8GLGuB",3.28333333333333,1.02662300883035,1732,"Analyzed","Analyzed",0
+"0XnbWTTY",3.41666666666667,1.48770858576476,953,"Excluded","Excluded: choice profile",1
+"0dxC8kBF",3.91666666666667,0.278717806785302,510,"Excluded","Excluded: prior-study criteria",0
+"0mPArGtp",2.95,1.6816557619486,818,"Analyzed","Analyzed",4
+"0od5qYg1",2.5,1.71236777294789,1815,"Analyzed","Analyzed",1
+"0w0mIMuO",2.7,1.58702365067336,1768,"Analyzed","Analyzed",1
+"118lrzKt",3.13333333333333,0.747122540414543,421,"Analyzed","Analyzed",0
+"1234567a",4.56666666666667,0.499717434280908,1358,"Excluded","Excluded: prior-study criteria",0
+"15a9AgwO",3.41666666666667,1.18309657852785,680,"Excluded","Excluded: prior-study criteria",0
+"166YDAio",3.13333333333333,1.33361578929103,1522,"Analyzed","Analyzed",2
+"1DCucwKw",2.86666666666667,1.68207566151866,544,"Analyzed","Analyzed",0
+"1Mp7VsNV",3.08333333333333,1.66001497508731,2558,"Analyzed","Analyzed",3
+"1NgokfSF",2.81666666666667,0.724666297641786,513,"Excluded","Excluded: prior-study criteria",0
+"1Qc6C2nK",3.13333333333333,1.06511186118462,1943,"Analyzed","Analyzed",2
+"1cT3n5Fi",NA,NA,160,"Excluded","Excluded: prior-study criteria",NA
+"1mvqe1Y3",3.15,1.75465482626129,704,"Analyzed","Analyzed",2
+"1pyFmdFh",4.01666666666667,1.03320575119082,1864,"Excluded","Excluded: prior-study criteria",3
+"1rDs1y19",3.86666666666667,0.982329756961698,1058,"Excluded","Excluded: prior-study criteria",0
+"2202wqvl",3.43333333333333,1.07933857126132,1139,"Analyzed","Analyzed",0
+"24si0lIq",2.88333333333333,0.738566331475177,396,"Analyzed","Analyzed",0
+"28JHPxs5",3.95,0.832089467158389,962,"Excluded","Excluded: prior-study criteria",0
+"2AMf7N4n",3,1.93977108556829,544,"Analyzed","Analyzed",2
+"2AbqF0a7",2.7,1.10928286499714,855,"Analyzed","Analyzed",0
+"2DXmZEwX",2.66666666666667,1.06828972561431,650,"Excluded","Excluded: prior-study criteria",0
+"2OEoJYzA",2.96666666666667,0.956098474941421,673,"Analyzed","Analyzed",2
+"2ZXNQEwN",2.85,0.953583784414513,784,"Analyzed","Analyzed",0
+"2ahbBCIV",4.16666666666667,0.668077602989218,891,"Excluded","Excluded: prior-study criteria",0
+"2b0HUnhe",3.1,1.49235339114695,1837,"Analyzed","Analyzed",0
+"2fi5TYyL",2.9,1.17458972281778,906,"Analyzed","Analyzed",2
+"2grNH5SG",4.01666666666667,0.982761013186598,620,"Excluded","Excluded: prior-study criteria",0
+"2n0R4z0W",3.18333333333333,1.770680867481,1485,"Analyzed","Analyzed",0
+"3LlpoSCQ",3.06666666666667,1.62466858854317,871,"Analyzed","Analyzed",1
+"3Vfg63R7",4.48333333333333,0.596363745975662,899,"Excluded","Excluded: prior-study criteria",0
+"3Vq9fXm9",2.68333333333333,1.73196925900095,452,"Analyzed","Analyzed",2
+"3yggEC7l",3.35,0.515028384934399,495,"Excluded","Excluded: prior-study criteria",0
+"432wre8r",5,0,4401213,"Excluded","Excluded: prior-study criteria",0
+"43GDbNy1",3.15,1.21884913764542,580,"Analyzed","Analyzed",0
+"4BSARJqx",2.73333333333333,1.62466858854317,1409,"Excluded","Dropped after DDM fit",2
+"4OAvPmmK",2.63333333333333,1.08871976856456,386,"Excluded","Excluded: prior-study criteria",1
+"4OfQYxOC",2.88333333333333,1.10609508076097,1067,"Analyzed","Analyzed",0
+"4fLRTS44",3.35,1.28650096998126,803,"Excluded","Excluded: choice profile",3
+"4lsMLrPn",3.18333333333333,1.22808472443699,987,"Excluded","Excluded: prior-study criteria",2
+"4oVCGVcU",2.85,1.63463570813349,521,"Analyzed","Analyzed",2
+"51AY294u",NA,NA,649,"Excluded","Excluded: prior-study criteria",NA
+"5EbjIM5n",2.98333333333333,0.892371942418529,1452,"Analyzed","Analyzed",2
+"5LC8zwZD",3.18333333333333,1.50131768865217,875,"Excluded","Excluded: prior-study criteria",0
+"5OQG7ttb",3.2,1.2861715624813,1373,"Analyzed","Analyzed",4
+"5OXSNlva",2.96666666666667,1.22081754583803,811,"Excluded","Excluded: prior-study criteria",2
+"5QVnvCoQ",2.81666666666667,1.57836717459947,1073,"Analyzed","Analyzed",0
+"5UHFLdCp",3.21666666666667,0.884741974578985,636,"Analyzed","Analyzed",3
+"5XtUZ72B",3.88333333333333,0.761169186891749,544,"Excluded","Excluded: prior-study criteria",1
+"5aKXQjiP",3.08333333333333,1.30568076492189,1194,"Excluded","Excluded: choice profile",1
+"5bm02YMv",3.4,1.97612872702228,1051,"Analyzed","Analyzed",0
+"5iGcGmt0",4.3,0.720169471580551,806,"Excluded","Excluded: prior-study criteria",0
+"5nDuOr94",3.4,0.847728770183371,2202,"Analyzed","Analyzed",1
+"5pd8VS5F",3.13333333333333,1.50103542417651,1345,"Excluded","Dropped after DDM fit",1
+"67MhajJX",3.08333333333333,1.61865885756547,861,"Analyzed","Analyzed",4
+"68jPm3Ff",3,1.35296285040509,1177,"Analyzed","Analyzed",2
+"69InPPvH",4.2,0.754646622879695,609,"Analyzed","Analyzed",0
+"6P6JSp2g",2.96666666666667,1.63610395702476,855,"Analyzed","Analyzed",0
+"6RVMuXzJ",3.16666666666667,1.55319972267931,1271,"Analyzed","Analyzed",1
+"6WNVca22",2.66666666666667,1.62258077197467,720,"Analyzed","Analyzed",2
+"6tPFsbZZ",3.33333333333333,0.968428163233925,334,"Excluded","Excluded: prior-study criteria",0
+"74zppFTd",4.13333333333333,0.769474103190111,1418,"Analyzed","Analyzed",3
+"7CFYPxcr",3.18333333333333,1.22808472443699,624,"Analyzed","Analyzed",4
+"7DeaCeuO",3.01666666666667,0.700887250456953,444,"Analyzed","Analyzed",0
+"7H7bbPAV",3.86666666666667,1.04907815330957,870,"Analyzed","Analyzed",2
+"7HPBJllG",3.15,1.02221096366518,529,"Analyzed","Analyzed",0
+"7Q8MQGaH",4.26666666666667,0.820637756676852,553,"Excluded","Excluded: prior-study criteria",0
+"7hprzq2x",2.68333333333333,1.88204420656908,937,"Excluded","Excluded: prior-study criteria",1
+"7iOxvPmE",2.96666666666667,1.27514261969592,490,"Analyzed","Analyzed",4
+"7niGWddX",3.08333333333333,1.89818527668739,2065,"Analyzed","Analyzed",0
+"7tOmIpBQ",4.51666666666667,0.503939284299098,526,"Excluded","Excluded: prior-study criteria",0
+"7vnNloK2",3.26666666666667,1.40056485779986,1426,"Excluded","Excluded: prior-study criteria",0
+"8J7DEjTW",2.91666666666667,1.59757938363189,660,"Analyzed","Analyzed",3
+"8SZBQxDi",2.95,1.52298769706906,987,"Analyzed","Analyzed",2
+"8ZuK6XNH",3.28333333333333,0.975838043430184,1473,"Analyzed","Analyzed",0
+"8amtZnx8",3.3,0.961989463982615,487,"Excluded","Excluded: choice profile",0
+"8h7ZKIwi",4.31666666666667,0.650727537210172,1112,"Excluded","Excluded: prior-study criteria",1
+"8huJxZZ7",3.11666666666667,1.341535506099,1188,"Analyzed","Analyzed",3
+"8lnFeNyY",3.6,1.78695840437965,449,"Analyzed","Analyzed",0
+"8rFFI7ez",2.98333333333333,0.965360504658649,834,"Analyzed","Analyzed",1
+"93bKvd5j",2.88333333333333,1.65797166938919,975,"Analyzed","Analyzed",3
+"9Gz9WbFd",2.86666666666667,1.06511186118462,720,"Analyzed","Analyzed",4
+"9nsFEmVp",3.06666666666667,1.08716185729394,730,"Analyzed","Analyzed",2
+"9ruWOyDp",2.9,0.796177307567068,1395,"Analyzed","Analyzed",1
+"A19BZSL0",3.43333333333333,0.499717434280908,1405,"Excluded","Excluded: prior-study criteria",0
+"A1EH9BPK",2.75,1.33562655899198,871,"Excluded","Excluded: prior-study criteria",0
+"A1R6EYMM",3.75,0.436666882304686,369,"Excluded","Excluded: prior-study criteria",NA
+"A1WVLHV6",3.06666666666667,0.841037830759331,477,"Excluded","Excluded: prior-study criteria",0
+"A2BWO7HV",3.88333333333333,0.761169186891749,926,"Excluded","Excluded: prior-study criteria",0
+"A2E3SM3T",3.3,1.45322551821101,1014,"Excluded","Excluded: prior-study criteria",4
+"A2EKD7TW",3.91666666666667,0.979305645864762,578,"Excluded","Excluded: prior-study criteria",1
+"A2KTV4TM",3.6,0.527224906178488,1219,"Excluded","Excluded: prior-study criteria",0
+"A2OX8TSR",2.8,1.75441332122591,1254,"Excluded","Excluded: prior-study criteria",3
+"A2Q01FE3",3.48333333333333,0.873172021156813,709,"Excluded","Excluded: prior-study criteria",0
+"A2QFZ252",3.33333333333333,0.50979113924206,342,"Excluded","Excluded: prior-study criteria",0
+"A2WSVHed",2.98333333333333,1.18595833617427,463,"Analyzed","Analyzed",0
+"A377LTGW",2.96666666666667,1.3896306870272,811,"Excluded","Excluded: prior-study criteria",3
+"A37GOGQD",3.18333333333333,1.08129969922683,750,"Excluded","Excluded: prior-study criteria",0
+"A3C9SDM1",4.5,0.504219484089611,1606,"Excluded","Excluded: prior-study criteria",0
+"A3CH1Z6J",3.33333333333333,0.876562366247208,1478,"Excluded","Excluded: prior-study criteria",4
+"A3D4LF50",3.96666666666667,0.801834055841572,1279,"Excluded","Excluded: prior-study criteria",0
+"A3KWDWJS",NA,NA,417,"Excluded","Excluded: prior-study criteria",NA
+"A3O73ODZ",4.53333333333333,0.503097748586463,555,"Excluded","Excluded: prior-study criteria",0
+"A3ONCP5E",4.45,0.501692052213544,1255,"Excluded","Excluded: prior-study criteria",1
+"A3S9PVM7",3.2,1.05444981235698,277,"Excluded","Excluded: prior-study criteria",0
+"A6qIJpr5",2.93333333333333,1.14783018094742,671,"Analyzed","Analyzed",3
+"AC9GykMn",2.68333333333333,1.3715223098177,2147,"Analyzed","Analyzed",1
+"AITXVK4T",4.33333333333333,0.475382688541528,1389,"Excluded","Excluded: prior-study criteria",0
+"AJZw1mrh",4.41666666666667,0.561223441609872,861,"Analyzed","Analyzed",0
+"AMI1LU94",4.5,0.504219484089611,713,"Excluded","Excluded: prior-study criteria",1
+"AOKC5LCQ",4.41666666666667,0.497167116011244,1298,"Excluded","Excluded: prior-study criteria",0
+"AVELEsHC",2.95,1.51181785289729,733,"Analyzed","Analyzed",4
+"AWR1VXJG",3.73333333333333,1.00619549717293,1953,"Excluded","Excluded: prior-study criteria",1
+"AbEkDeHe",3.4,1.16735250220607,847,"Excluded","Excluded: choice profile",0
+"AdknkiyI",3.68333333333333,1.34657968058269,298,"Excluded","Excluded: prior-study criteria",0
+"AdwSSzqe",3.43333333333333,1.26714234303575,1413,"Analyzed","Analyzed",3
+"AjXhaSkY",3.11666666666667,0.804471964236752,1492,"Analyzed","Analyzed",0
+"AqldY8Rn",3.11666666666667,1.341535506099,748,"Excluded","Excluded: prior-study criteria",4
+"Au0aY0N5",3.16666666666667,1.68911436694878,2439,"Analyzed","Analyzed",0
+"AyjDXCOl",3.05,1.09583185645751,661,"Analyzed","Analyzed",3
+"B125slw9",3.61666666666667,1.341535506099,1515,"Analyzed","Analyzed",4
+"BChlFKPA",NA,NA,379,"Excluded","Excluded: prior-study criteria",0
+"BFMHka6s",3,1.16444501947916,1330,"Excluded","Excluded: prior-study criteria",0
+"BL62EDfz",2.95,1.19922291223122,1335,"Analyzed","Analyzed",1
+"BONIFI3t",3.11666666666667,1.60604437394284,851,"Analyzed","Analyzed",1
+"BY6R8p2P",3.06666666666667,1.37614872406091,1914,"Excluded","Excluded: choice profile",4
+"BemKc0pg",2.93333333333333,1.24691710225139,1332,"Excluded","Excluded: choice profile",3
+"BhDFD33t",3.21666666666667,0.825271740899738,1501,"Analyzed","Analyzed",1
+"Bmz98E68",3.68333333333333,0.83344632002402,988,"Excluded","Excluded: prior-study criteria",0
+"BoM4UtzL",4.06666666666667,0.880421060026311,695,"Analyzed","Analyzed",0
+"Bp2G8unf",3.41666666666667,1.44141722475458,1424,"Analyzed","Analyzed",1
+"Bp9jWSop",4.4,0.494032181755571,900,"Excluded","Excluded: prior-study criteria",0
+"BsG1rmyg",3.31666666666667,0.982761013186598,808,"Analyzed","Analyzed",2
+"BwznM0tL",3.08333333333333,1.95102464749712,908,"Analyzed","Analyzed",0
+"CB6YrkwU",3.85,1.02221096366518,953,"Excluded","Excluded: prior-study criteria",0
+"CHPYm4bA",2.85,1.16189500386223,511,"Analyzed","Analyzed",4
+"CHa3NaT5",2.9,1.59128985097955,1190,"Analyzed","Analyzed",1
+"CNd1TnY6",2.76666666666667,1.36997669987197,2128,"Analyzed","Analyzed",0
+"CjqjAD3K",2.85,1.40006053137906,827,"Analyzed","Analyzed",3
+"Ck3Huwa8",3.58333333333333,1.52150312238011,1562,"Analyzed","Analyzed",3
+"CkbwsuQ3",2.68333333333333,1.29525426686007,909,"Analyzed","Analyzed",3
+"Cn35dU00",3.3,1.23919055045581,1275,"Analyzed","Analyzed",2
+"CqpcE2L8",3.2,1.41181455545091,1912,"Analyzed","Analyzed",3
+"Cr0KzMxo",2.91666666666667,1.29263450162923,553,"Analyzed","Analyzed",1
+"CxvR3ahI",3.18333333333333,1.32116623707568,1184,"Excluded","Excluded: prior-study criteria",0
+"D39C8aUI",3.41666666666667,0.787436662326019,1287,"Analyzed","Analyzed",3
+"DCeRQZgx",3.16666666666667,1.23736552656347,668,"Excluded","Excluded: prior-study criteria",1
+"DJe6dUrr",3.08333333333333,1.44141722475458,2331,"Analyzed","Analyzed",3
+"DKS3kHre",3.03333333333333,1.52900395923118,1039,"Excluded","Excluded: choice profile",3
+"DR0PnnbZ",2.8,1.27292536428922,829,"Analyzed","Analyzed",4
+"DT6IX6zb",4.6,0.527224906178488,239,"Excluded","Excluded: prior-study criteria",0
+"DYXxIsPw",4.03333333333333,0.609714205533526,723,"Excluded","Excluded: choice profile",1
+"DglxbtVz",2.93333333333333,1.4828587446204,1156,"Analyzed","Analyzed",1
+"DjRwPdxE",3,0.901975233603395,707,"Excluded","Excluded: prior-study criteria",2
+"DmLRSui9",2.96666666666667,1.68710630477626,608,"Analyzed","Analyzed",4
+"DzFJpdjf",3.06666666666667,1.93860570782082,943,"Analyzed","Analyzed",1
+"E7xB8PpX",2.86666666666667,1.65157004568962,1147,"Analyzed","Analyzed",3
+"E8v76SEd",4,0.487122300447455,714,"Excluded","Excluded: prior-study criteria",1
+"EFbTrXQ0",3.45,1.79853989744789,1410,"Analyzed","Analyzed",1
+"EHEN6PVP",2.71666666666667,1.6270141797916,702,"Analyzed","Analyzed",1
+"ELDTafab",2.9,1.18893200900384,1116,"Analyzed","Analyzed",3
+"ELwgKPbg",3.36666666666667,0.519669603859165,1923,"Analyzed","Analyzed",0
+"ERm6KpMp",2.93333333333333,1.24691710225139,1655,"Analyzed","Analyzed",2
+"EqkeITSy",2.96666666666667,1.49537894598339,490,"Analyzed","Analyzed",4
+"EwD7E15U",3.23333333333333,1.73074556939739,938,"Excluded","Excluded: prior-study criteria",0
+"Ez603NyM",3.11666666666667,1.70832127596682,607,"Analyzed","Analyzed",0
+"F29MlTSq",2.95,0.928366526098211,840,"Excluded","Excluded: prior-study criteria",1
+"FBd2uH4m",3.1,1.45788330425091,752,"Analyzed","Analyzed",2
+"FIvIqXVg",2.93333333333333,1.42456257534495,1011,"Excluded","Excluded: prior-study criteria",1
+"FOIARTrK",4.13333333333333,0.747122540414543,1196,"Excluded","Excluded: prior-study criteria",3
+"FWZUv5XX",3.01666666666667,1.62075172626534,2043,"Analyzed","Analyzed",0
+"FWwq7fwS",3.63333333333333,0.485961101416971,637,"Analyzed","Analyzed",0
+"FiAelrTI",2.93333333333333,0.709897740706284,1152,"Analyzed","Analyzed",0
+"FiYe2WGr",2.85,1.52743276364547,924,"Analyzed","Analyzed",2
+"FkpwSOIN",3.01666666666667,1.38382504364259,1888,"Analyzed","Analyzed",4
+"GZKGfSQQ",3.48333333333333,0.873172021156813,543,"Excluded","Excluded: choice profile",0
+"GZRvF15g",3,1.71730968155801,907,"Analyzed","Analyzed",0
+"GfGYC6a7",2.91666666666667,1.70036553065895,444,"Analyzed","Analyzed",3
+"H4lFOsfz",2.81666666666667,0.676272602408497,694,"Excluded","Excluded: prior-study criteria",0
+"HONESTLY",4.55,0.501692052213544,567,"Excluded","Excluded: prior-study criteria",0
+"HeIHchyx",2.81666666666667,1.09686250033118,581,"Excluded","Excluded: prior-study criteria",0
+"HnYJIuGo",3.11666666666667,1.35411071157754,969,"Analyzed","Analyzed",4
+"HtZfNaUO",2.96666666666667,0.712281287672477,885,"Analyzed","Analyzed",3
+"Huytq499",3.85,0.819776736865035,921,"Excluded","Excluded: prior-study criteria",1
+"HzSuvvLq",4.06666666666667,0.685606663601763,465,"Excluded","Excluded: prior-study criteria",1
+"IDSdkuga",3.45,0.871876993345635,929,"Excluded","Excluded: prior-study criteria",0
+"IIcxwLiZ",3.06666666666667,0.660422737411724,556,"Excluded","Excluded: prior-study criteria",0
+"IMK4Xl2F",3.51666666666667,0.650727537210172,1086,"Analyzed","Analyzed",2
+"ISzIawIX",4.26666666666667,0.660422737411724,566,"Analyzed","Analyzed",0
+"IT4PJexb",3.16666666666667,0.762837403353298,530,"Analyzed","Analyzed",1
+"IVLLwkoC",3.15,1.60322767661079,1032,"Analyzed","Analyzed",0
+"IbPAvzE4",4.33333333333333,0.50979113924206,970,"Excluded","Excluded: prior-study criteria",0
+"Ifto29AI",3.53333333333333,1.24146805752428,2237,"Analyzed","Analyzed",3
+"IfzXgseD",3.63333333333333,1.16395973293195,1675,"Excluded","Excluded: prior-study criteria",0
+"IlJ70IIS",3.38333333333333,1.60604437394284,1097,"Analyzed","Analyzed",1
+"Iq3P2lx1",3.5,0.911322376865767,2520,"Analyzed","Analyzed",0
+"IseQ7qhW",NA,NA,541,"Excluded","Excluded: prior-study criteria",2
+"IuFzdLNr",2.9,1.54809888879604,606,"Analyzed","Analyzed",3
+"IxrmLTW5",2.41666666666667,0.618682763281733,623,"Analyzed","Analyzed",1
+"IyWej6Bt",3.55,1.08025420737083,3845,"Excluded","Excluded: prior-study criteria",1
+"IzZojuRm",4.26666666666667,0.685606663601763,667,"Excluded","Excluded: prior-study criteria",0
+"J1Smw77q",4.1,0.729522713718023,976,"Excluded","Excluded: prior-study criteria",0
+"J2NLMY81",3.06666666666667,1.33868980554878,619,"Analyzed","Analyzed",4
+"J5yQbVY1",3.15,0.917346948394561,409,"Analyzed","Analyzed",3
+"JPBOoSa8",4.03333333333333,0.901348644272056,1523,"Analyzed","Analyzed",0
+"JWQwr6QM",3.01666666666667,1.06550961256259,863,"Analyzed","Analyzed",1
+"Jdf3zZKJ",2.98333333333333,1.770680867481,902,"Analyzed","Analyzed",3
+"JkUNFQdh",3.71666666666667,0.454419602505485,590,"Excluded","Excluded: prior-study criteria",0
+"JouiVQKi",4.35,0.605763280945926,638,"Excluded","Excluded: prior-study criteria",0
+"JsItZzmK",3.01666666666667,1.81791151046661,977,"Analyzed","Analyzed",1
+"JuRkvq59",3.66666666666667,0.751646028002829,736,"Analyzed","Analyzed",0
+"KEjwcRBI",3.01666666666667,1.89997026441198,1022,"Excluded","Excluded: choice profile",1
+"KGoGk5cw",3.21666666666667,1.48542828003955,904,"Analyzed","Analyzed",1
+"KQJVLinu",3.51666666666667,1.03320575119082,1231,"Analyzed","Analyzed",0
+"KZDOCQto",3.1,1.6229289279216,1438,"Analyzed","Analyzed",3
+"Kh9UMpSL",2.9,1.70443091551483,787,"Analyzed","Analyzed",2
+"Kk6YC2QE",3.23333333333333,1.14042315468926,704,"Analyzed","Analyzed",2
+"KmItNkUl",4.46666666666667,0.503097748586463,1284,"Excluded","Excluded: prior-study criteria",0
+"KoKsSwog",5,0,2508,"Analyzed","Analyzed",1
+"L3lKkNGG",2.96666666666667,0.843050688438623,516,"Analyzed","Analyzed",1
+"LFKtVHVo",2.86666666666667,1.87279060035242,487,"Analyzed","Analyzed",0
+"LQBtG6Gj",3.2,1.0704030604704,830,"Analyzed","Analyzed",1
+"LiqsRkDI",2.96666666666667,1.88631707048298,1074,"Analyzed","Analyzed",2
+"LkeulviE",4.43333333333333,0.673132486686513,1764,"Analyzed","Analyzed",2
+"LnWUAWn8",3.91666666666667,0.787436662326019,452,"Excluded","Excluded: prior-study criteria",1
+"MAFppUOF",3,0.956689206214921,1178,"Analyzed","Analyzed",1
+"MAtV6UQp",3.03333333333333,1.33995530745943,1978,"Analyzed","Analyzed",0
+"MY1hOqNb",2.7,1.26625030326096,521,"Analyzed","Analyzed",0
+"MfIG8GCF",3.18333333333333,1.55674221619497,1668,"Analyzed","Analyzed",0
+"MgvuXvBj",3.43333333333333,0.963163338078858,449,"Excluded","Excluded: prior-study criteria",0
+"MiVPRFmd",2.96666666666667,1.90420290425285,611,"Analyzed","Analyzed",1
+"MvJyL8Px",3.06666666666667,1.77426677781839,888,"Analyzed","Analyzed",4
+"MynHRwZZ",3.55,0.871876993345635,773,"Analyzed","Analyzed",1
+"NEFYx2OX",3.1,1.17458972281778,760,"Analyzed","Analyzed",4
+"NELQgNPm",4.45,0.501692052213544,1129,"Analyzed","Analyzed",0
+"NF0mUIOn",3.51666666666667,1.12734376070578,619,"Excluded","Excluded: prior-study criteria",0
+"NSVWjdmP",4.46666666666667,0.503097748586463,2828,"Excluded","Excluded: prior-study criteria",1
+"NStUrg8N",3.6,0.827493663245746,1872,"Excluded","Excluded: choice profile",0
+"NUekQutS",4.08333333333333,0.787436662326019,919,"Excluded","Excluded: choice profile",0
+"NecFqh23",3.03333333333333,1.57271940526071,815,"Analyzed","Analyzed",3
+"NnIpn6Q1",3.11666666666667,1.07501149645672,1176,"Analyzed","Analyzed",2
+"NoFbwxGR",3.05,0.998728004573139,1331,"Excluded","Excluded: choice profile",1
+"NokzeZ5h",3.41666666666667,0.530163603360023,947,"Analyzed","Analyzed",0
+"NrPR7KW8",3.08333333333333,1.45312832224272,525,"Analyzed","Analyzed",2
+"Nvl3nsVX",3.96666666666667,0.882344078829981,1167,"Analyzed","Analyzed",1
+"NvlSn2Wp",3.03333333333333,1.41381401057465,1895,"Analyzed","Analyzed",4
+"O865RoK5",4.5,0.567480306535024,689,"Excluded","Excluded: prior-study criteria",0
+"OEFg8Ela",3.11666666666667,1.41531174821407,1114,"Analyzed","Analyzed",1
+"OFii3DZn",3.31666666666667,1.38382504364259,1254,"Analyzed","Analyzed",3
+"OUrZZFrL",4.01666666666667,0.650727537210172,1256,"Excluded","Excluded: prior-study criteria",0
+"Oc3yK3fM",3.03333333333333,1.30145507442034,1071,"Analyzed","Analyzed",0
+"OoOlVuyy",3.01666666666667,1.43197938942968,451,"Analyzed","Analyzed",2
+"Or2RochJ",3.38333333333333,1.12131379763577,1118,"Analyzed","Analyzed",0
+"P6H5uC5H",2.73333333333333,1.0229016001629,465,"Analyzed","Analyzed",2
+"P9HFcDrC",2.95,1.53407621404821,537,"Analyzed","Analyzed",4
+"PFWWN1TJ",2.95,1.04840476075459,1074,"Analyzed","Analyzed",2
+"PLOGdhfT",3,1.83192035945612,599,"Analyzed","Analyzed",3
+"PMgKjxWZ",3.71666666666667,0.940459077704159,1342,"Analyzed","Analyzed",1
+"PPgUxax6",3.16666666666667,1.45166960179249,872,"Analyzed","Analyzed",1
+"PRK1trPJ",2.83333333333333,1.2235910841629,1221,"Analyzed","Analyzed",1
+"PYmaMUco",3.01666666666667,1.61026018180521,1512,"Analyzed","Analyzed",1
+"Pb1Rc8Z6",3.1,0.877206660612953,2077,"Analyzed","Analyzed",3
+"PfJcC1IZ",3.3,0.787616012439341,615,"Excluded","Excluded: prior-study criteria",1
+"PkYvxLYh",4,0.713074032812293,592,"Excluded","Excluded: prior-study criteria",0
+"Pkn0xBMM",2.93333333333333,1.36377674333071,402,"Analyzed","Analyzed",0
+"Pta7Q8ga",3.21666666666667,1.61656327935475,1306,"Excluded","Excluded: prior-study criteria",0
+"Ptf309r1",3.45,0.768555766422772,2098,"Excluded","Excluded: prior-study criteria",0
+"PuobTnG4",3.98333333333333,0.853540317411151,1259,"Excluded","Excluded: prior-study criteria",1
+"PvlMTMrQ",4.45,0.501692052213544,1169,"Analyzed","Analyzed",0
+"Py4PhBip",2.95,1.98660770397467,835,"Analyzed","Analyzed",3
+"Q25NEsIS",4.28333333333333,1.1945024730791,1247,"Analyzed","Analyzed",1
+"Q5Bt4RwN",3.1,1.6539628836038,493,"Analyzed","Analyzed",4
+"Q5J6Q6Y8",3,1.43798352221765,606,"Analyzed","Analyzed",2
+"QDgYtiEF",3.06666666666667,1.97326767336174,5755,"Analyzed","Analyzed",1
+"QKdkcfRJ",3.08333333333333,1.54362183243887,856,"Analyzed","Analyzed",3
+"QfnqVbad",3.15,1.53848924355758,883,"Analyzed","Analyzed",3
+"QjnNsz9d",3.53333333333333,0.769474103190111,923,"Analyzed","Analyzed",0
+"QvFoCApm",3.85,1.03865950114657,740,"Excluded","Excluded: prior-study criteria",0
+"R8pRzMWN",2.95,0.891104817970462,1253,"Excluded","Dropped after DDM fit",0
+"RGrm84nq",2.86666666666667,1.67196896681389,1098,"Analyzed","Analyzed",3
+"RTIqKkVS",2.95,1.63048292731668,789,"Analyzed","Analyzed",2
+"RU3gTWzp",3.23333333333333,1.56623987455076,1541,"Analyzed","Analyzed",2
+"RUML71SS",3.71666666666667,0.865372784698696,743,"Analyzed","Analyzed",0
+"RWLt1Yo8",3.18333333333333,0.947640543070027,1249,"Analyzed","Analyzed",4
+"RYAeJa3l",2.93333333333333,1.10264192240253,1796,"Analyzed","Analyzed",4
+"RgqYP1WF",3.15,1.59262069494469,822,"Analyzed","Analyzed",4
+"RsCXBTrX",3.18333333333333,1.62075172626534,1094,"Analyzed","Analyzed",3
+"SF1vPugW",2.95,1.52298769706906,1142,"Excluded","Excluded: choice profile",2
+"SKU7qbFs",3.05,1.26792236301915,857,"Analyzed","Analyzed",4
+"SQgGdEDQ",3.06666666666667,1.03933920771833,994,"Analyzed","Analyzed",3
+"SlQwUBGa",3.06666666666667,1.11790765008756,714,"Analyzed","Analyzed",0
+"SxXiuDSp",3.46666666666667,1.50103542417651,1588,"Analyzed","Analyzed",2
+"T7tIrld6",2.7,1.51041581433835,2312,"Analyzed","Analyzed",2
+"TJQlXJbQ",3.41666666666667,1.94231791168606,484,"Excluded","Excluded: prior-study criteria",0
+"TNwUIEyK",3.15,1.19071264802617,1233,"Analyzed","Analyzed",3
+"TdJmvlh6",3.51666666666667,1.87301684199461,352,"Excluded","Excluded: prior-study criteria",0
+"U1xTROdZ",1,0,506,"Excluded","Excluded: prior-study criteria",0
+"U3lXYIXx",2.96666666666667,1.0078785685982,1659,"Excluded","Excluded: choice profile",1
+"U4cfjPKK",2.91666666666667,1.47627183508778,677,"Analyzed","Analyzed",0
+"U5pm2zYb",3.18333333333333,1.5348126001288,1000,"Analyzed","Analyzed",4
+"UGYwpyJ3",2.93333333333333,1.84911033731036,1102,"Analyzed","Analyzed",4
+"UL9p4fnY",2.96666666666667,1.49537894598339,502,"Analyzed","Analyzed",0
+"UMtyPlQ6",3.1,1.96322115110234,666,"Analyzed","Analyzed",3
+"URHp5hRt",4.53333333333333,0.503097748586463,592,"Excluded","Excluded: prior-study criteria",1
+"US362jMg",4.8,0.403375587271689,1380,"Excluded","Excluded: prior-study criteria",2
+"UUb67w89",4.05,0.699273230466788,582,"Excluded","Excluded: choice profile",0
+"UUw5Ktn0",3.86666666666667,0.72408133887757,2033,"Excluded","Excluded: choice profile",3
+"UsYxJna9",3.45,0.746176695573474,805,"Excluded","Excluded: prior-study criteria",1
+"V2AtALIS",2.86666666666667,1.69212199210287,790,"Excluded","Excluded: prior-study criteria",4
+"V37KxdDZ",3.13333333333333,1.34626497337303,785,"Analyzed","Analyzed",0
+"V5m8r29P",3.06666666666667,1.32596835950014,887,"Excluded","Excluded: choice profile",4
+"V8H6BSKF",3.53333333333333,1.38351880861277,1726,"Analyzed","Analyzed",1
+"V8Mricl7",3.03333333333333,1.08871976856456,627,"Analyzed","Analyzed",2
+"V8bWk1FM",3.3,1.23919055045581,576,"Analyzed","Analyzed",3
+"VAh753hk",3.85,0.798833895888463,670,"Excluded","Excluded: prior-study criteria",1
+"VGUPHA1w",4.36666666666667,0.901348644272056,622,"Excluded","Excluded: choice profile",0
+"VIFmBC3I",3.01666666666667,0.770024579547526,520,"Excluded","Excluded: prior-study criteria",0
+"VJwB0vuA",2.86666666666667,0.999434868561816,908,"Excluded","Excluded: prior-study criteria",0
+"VKvb62fm",4.51666666666667,0.503939284299098,573,"Excluded","Excluded: prior-study criteria",0
+"VXjd2cHm",3.01666666666667,1.82721114405855,1458,"Analyzed","Analyzed",2
+"VsmLtxkg",4.28333333333333,0.865372784698696,1432,"Excluded","Excluded: prior-study criteria",0
+"VvENFQ7O",3.15,1.38790172074275,1003,"Analyzed","Analyzed",1
+"VxbKEyPn",3.05,1.95218261163052,1281,"Analyzed","Analyzed",3
+"WBvThcfm",3,1.7369367151806,449,"Analyzed","Analyzed",3
+"WFQRR38I",2.96666666666667,1.44933259528357,1172,"Excluded","Excluded: prior-study criteria",3
+"WHBunwtP",3.06666666666667,1.83992139355552,572,"Analyzed","Analyzed",1
+"Wd40wzL7",3.26666666666667,0.860954666549353,675,"Excluded","Excluded: prior-study criteria",0
+"Wg91mEvm",3.41666666666667,1.40569865211751,833,"Excluded","Excluded: prior-study criteria",2
+"WkffGIxf",4.55,0.501692052213544,1289,"Analyzed","Analyzed",2
+"Wl8Cm2If",2.93333333333333,1.31312367479637,887,"Analyzed","Analyzed",2
+"Wq9ZZIfE",4.3,0.829539386177859,1112,"Excluded","Excluded: choice profile",0
+"Ws5xQ0WX",3.4,1.09234625416259,1756,"Excluded","Excluded: prior-study criteria",0
+"WzH5LqjT",3.36666666666667,0.938203596614597,2244,"Analyzed","Analyzed",1
+"X1bx0YKm",3.25,1.51405841411616,677,"Excluded","Excluded: prior-study criteria",0
+"XAdwkxXt",2.75,1.15897383015453,1017,"Analyzed","Analyzed",0
+"XKjdlPqs",3.76666666666667,0.810245132747641,1175,"Excluded","Excluded: prior-study criteria",0
+"XMtBfnkV",2.63333333333333,0.551320961201265,943,"Excluded","Excluded: prior-study criteria",2
+"XgRFvsrQ",3.03333333333333,1.40177450091391,938,"Analyzed","Analyzed",4
+"XnTaGiwO",4.33333333333333,0.475382688541528,584,"Excluded","Excluded: prior-study criteria",0
+"Y146QJU7",3,1.36543281770324,825,"Analyzed","Analyzed",2
+"Y7jrydml",3.13333333333333,1.94384440566788,781,"Excluded","Excluded: prior-study criteria",3
+"YP1JBJNv",3.3,0.696236858196881,1745,"Excluded","Excluded: prior-study criteria",0
+"YVHXvkQg",3.01666666666667,1.95276133620015,570,"Analyzed","Analyzed",3
+"YWGWtvxl",3.05,1.17061478849827,1002,"Analyzed","Analyzed",1
+"YWQGuaBm",3,1.00843896817922,526,"Analyzed","Analyzed",3
+"YbBVLu6T",2.93333333333333,1.60366811168314,411,"Excluded","Excluded: choice profile",0
+"YjqaAJeV",2.96666666666667,1.49537894598339,630,"Analyzed","Analyzed",0
+"YoueUvij",2.91666666666667,1.31859795425738,903,"Analyzed","Analyzed",3
+"Your Web",3.95,0.746176695573474,1700,"Excluded","Excluded: prior-study criteria",0
+"YwC7SCEs",3.2,1.48209654526671,1397,"Analyzed","Analyzed",2
+"Z9R2kx0b",3.31666666666667,1.34657968058269,4466,"Analyzed","Analyzed",0
+"ZFgqNMKm",4.26666666666667,0.660422737411724,2617,"Analyzed","Analyzed",1
+"ZJ8tICU0",3.36666666666667,0.822700527647874,1106,"Excluded","Excluded: prior-study criteria",0
+"ZQQSYLal",2.91666666666667,1.12433282162592,670,"Analyzed","Analyzed",1
+"ZRg7zJoA",3.38333333333333,1.30308196168547,1516,"Analyzed","Analyzed",2
+"ZdOboCjp",3.28333333333333,1.26345861966897,1059,"Excluded","Excluded: prior-study criteria",0
+"Zg8wzJ7p",3.13333333333333,1.37121332720353,817,"Analyzed","Analyzed",3
+"ZkkJlVaw",3.18333333333333,1.63117579165363,1567,"Analyzed","Analyzed",2
+"a3HN2119",3.16666666666667,0.994334232022488,2239,"Excluded","Excluded: prior-study criteria",3
+"a4XUG5Lx",3.83333333333333,0.762837403353298,1197,"Excluded","Excluded: choice profile",1
+"a7fPdPUZ",3.05,1.12634100866328,1143,"Analyzed","Analyzed",1
+"aDmYSsL4",3.13333333333333,1.45516807424221,693,"Analyzed","Analyzed",3
+"aGXowW1Q",4.06666666666667,0.860954666549353,518,"Excluded","Excluded: prior-study criteria",0
+"aOZjarzl",3.71666666666667,0.8455600223594,1137,"Analyzed","Analyzed",0
+"aTDPLvkF",2.9,1.20310333185419,1654,"Analyzed","Analyzed",3
+"aUTnufFb",2.96666666666667,1.41381401057465,488,"Analyzed","Analyzed",1
+"aVhScqoI",3.28333333333333,1.18022788185475,492,"Analyzed","Analyzed",0
+"aXOdUdE0",3.2,1.41181455545091,1692,"Analyzed","Analyzed",2
+"aay5PrVz",3.13333333333333,1.79893251460148,410,"Excluded","Excluded: choice profile",3
+"ab4wLuHZ",2.81666666666667,0.947640543070027,861,"Analyzed","Analyzed",3
+"abHw9o23",2.91666666666667,1.89818527668739,717,"Analyzed","Analyzed",1
+"abj7G8VQ",2.88333333333333,1.47397383628628,892,"Analyzed","Analyzed",0
+"abltU7Yp",2.93333333333333,1.00619549717293,743,"Analyzed","Analyzed",1
+"afKarTMY",3.83333333333333,0.375823014001414,2732,"Analyzed","Analyzed",0
+"ancUdoj3",2.7,1.53269453655087,1194,"Analyzed","Analyzed",0
+"apBjGlHD",4.46666666666667,0.595652801459882,793,"Excluded","Excluded: prior-study criteria",0
+"arj05P6s",3.46666666666667,0.964921471585996,961,"Analyzed","Analyzed",1
+"b5cZyaMQ",3.05,1.06444861193842,776,"Analyzed","Analyzed",0
+"bbjMsNrW",3.01666666666667,1.03320575119082,472,"Excluded","Excluded: prior-study criteria",3
+"bqeWLmbS",3.6,0.960225962107401,667,"Excluded","Excluded: prior-study criteria",0
+"brpwnOOw",2.83333333333333,1.57487332465204,669,"Analyzed","Analyzed",0
+"buRo9E2Z",2.96666666666667,1.31441379170306,679,"Analyzed","Analyzed",1
+"bvvyNV1E",2.9,1.45788330425091,972,"Analyzed","Analyzed",4
+"bwVvThEM",3.01666666666667,1.08129969922683,1176,"Excluded","Excluded: choice profile",4
+"bz4Omt33",2.95,1.81728984283778,778,"Analyzed","Analyzed",0
+"c4uz0ADw",3.13333333333333,0.999434868561816,591,"Excluded","Excluded: prior-study criteria",0
+"cLZrBIi5",3.25,1.18786234436173,1324,"Excluded","Dropped after DDM fit",0
+"cR3c5iQJ",3.01666666666667,1.55674221619497,1262,"Analyzed","Analyzed",3
+"cUOeK16P",2.9,1.21710966317887,666,"Excluded","Excluded: prior-study criteria",4
+"cgqVDpEI",2.36666666666667,1.41381401057465,484,"Analyzed","Analyzed",0
+"cik7HP08",2.88333333333333,1.88743990064083,1346,"Analyzed","Analyzed",1
+"cjwSQb96",3.38333333333333,0.975838043430184,2192,"Analyzed","Analyzed",1
+"clGGPSOW",2.88333333333333,0.940459077704159,666,"Analyzed","Analyzed",0
+"cmbGAV1j",3.65,0.988493117865672,1098,"Excluded","Excluded: prior-study criteria",0
+"cpKDZnz8",NA,NA,1572,"Excluded","Excluded: prior-study criteria",NA
+"ct65fM69",3,1.54041596847482,630,"Excluded","Excluded: prior-study criteria",2
+"cygUaw4B",3.75,1.05163311253965,559,"Excluded","Excluded: prior-study criteria",0
+"d6D0kUtE",2.86666666666667,1.71203780516894,876,"Analyzed","Analyzed",0
+"dBK1KPWP",3.65,1.00549338593177,1109,"Analyzed","Analyzed",1
+"dGtqEAzd",2.95,1.56687100482545,1621,"Analyzed","Analyzed",2
+"dHhd7ijB",2.88333333333333,1.50807618683896,905,"Analyzed","Analyzed",2
+"dVbks3EO",3.18333333333333,1.46705824254037,684,"Analyzed","Analyzed",2
+"datB06du",3.28333333333333,1.05912766578415,3114,"Analyzed","Analyzed",1
+"ddgWaCcz",2.6,1.97612872702228,971,"Analyzed","Analyzed",0
+"dhMz6KQB",4.03333333333333,0.822700527647874,677,"Excluded","Excluded: prior-study criteria",0
+"dmFPvBg0",2.96666666666667,1.19272749195132,487,"Analyzed","Analyzed",1
+"doM4s6kS",4.43333333333333,0.499717434280908,658,"Analyzed","Analyzed",0
+"drdVxcTK",3.38333333333333,1.47397383628628,867,"Analyzed","Analyzed",4
+"dxBvcmlX",3.25,1.70368493944196,1058,"Excluded","Excluded: prior-study criteria",3
+"e1YpeQ5t",3.9,0.705907277725455,858,"Analyzed","Analyzed",0
+"eGO7FSvl",3.28333333333333,1.16577851585222,696,"Excluded","Excluded: choice profile",3
+"eN7MSo4X",3.2,1.48209654526671,454,"Analyzed","Analyzed",3
+"eOPKwztn",4.36666666666667,0.519669603859165,836,"Excluded","Excluded: prior-study criteria",0
+"eOxJU1WG",3.86666666666667,0.791194477081945,1479,"Excluded","Excluded: prior-study criteria",1
+"ePcpYsUC",3.75,0.894900808820239,677,"Excluded","Excluded: prior-study criteria",1
+"eTmK8gvj",2.96666666666667,0.973664520700049,1848,"Analyzed","Analyzed",2
+"f0yskO7t",2.98333333333333,1.55674221619497,820,"Analyzed","Analyzed",0
+"fKXwBlUd",3.8,0.935187826688543,3310,"Analyzed","Analyzed",3
+"fZqXwNbj",4.53333333333333,0.503097748586463,1964,"Excluded","Excluded: prior-study criteria",0
+"fanJmUyU",2.88333333333333,1.24997175109323,1063,"Analyzed","Analyzed",2
+"fhRzSGIL",3.56666666666667,0.870742264045728,1409,"Excluded","Excluded: prior-study criteria",1
+"fhdEZjgH",3.15,1.35076877043647,862,"Analyzed","Analyzed",2
+"foGC2kJQ",3.2,1.38759638541384,1092,"Analyzed","Analyzed",1
+"fpvlcdqF",2.98333333333333,1.88204420656908,605,"Analyzed","Analyzed",0
+"fs0xjcjk",2.86666666666667,1.39571580161223,956,"Analyzed","Analyzed",1
+"gTYGTxua",3.96666666666667,0.712281287672477,1239,"Excluded","Excluded: choice profile",0
+"gW2JvBUi",4,0.843720573874823,3338,"Excluded","Excluded: prior-study criteria",3
+"gcQgP0AW",3.93333333333333,0.841037830759331,1033,"Excluded","Excluded: choice profile",0
+"gd68nvgO",3.03333333333333,1.75602272741814,690,"Analyzed","Analyzed",1
+"ge9IUrof",2.8,1.65498732649149,765,"Analyzed","Analyzed",0
+"glf2fJjd",3.31666666666667,1.78022724379446,843,"Analyzed","Analyzed",3
+"gn79YwSm",3.76666666666667,0.9806028354558,750,"Excluded","Excluded: prior-study criteria",1
+"gygfx4WM",2.93333333333333,1.47138429766408,1039,"Analyzed","Analyzed",4
+"hIvODv0v",4.46666666666667,0.503097748586463,331,"Analyzed","Analyzed",1
+"hM0F331w",2.71666666666667,1.72805040206887,1958,"Analyzed","Analyzed",1
+"hN7SByhx",2.83333333333333,1.56407406589836,694,"Analyzed","Analyzed",2
+"hYlRp8qK",3.06666666666667,1.83068632741345,1949,"Analyzed","Analyzed",4
+"hoodtpXc",4.58333333333333,0.497167116011244,838,"Excluded","Excluded: choice profile",0
+"https://",2.96666666666667,1.56190525404036,568,"Excluded","Excluded: prior-study criteria",1
+"i3NDDrkR",2.66666666666667,1.06828972561431,1265,"Excluded","Excluded: prior-study criteria",0
+"iBU9BDgb",2.91666666666667,1.70036553065895,611,"Excluded","Excluded: prior-study criteria",4
+"iDUgyaRI",3.71666666666667,1.02662300883035,918,"Analyzed","Analyzed",1
+"iDbx0wtF",4.18333333333333,0.770024579547526,584,"Analyzed","Analyzed",2
+"iKOBuAwe",4.45,0.501692052213544,2165,"Excluded","Excluded: prior-study criteria",0
+"iPGrqmED",4.43333333333333,0.673132486686513,1180,"Analyzed","Analyzed",0
+"iRvjemEM",2.95,0.340736987888392,473,"Excluded","Excluded: prior-study criteria",1
+"iUUX7woF",3,1.42614806562459,4153,"Analyzed","Analyzed",1
+"iVT9r0Bz",2.91666666666667,0.696033962415742,828,"Analyzed","Analyzed",0
+"iXaj7SqN",3.96666666666667,0.758380671521798,697,"Excluded","Excluded: prior-study criteria",0
+"iccIgFb3",3.43333333333333,0.499717434280908,1133,"Excluded","Excluded: prior-study criteria",2
+"ichFhaDj",3.06666666666667,1.13296770439807,581,"Excluded","Excluded: prior-study criteria",2
+"iqmI9XSH",4.23333333333333,0.789049345767739,892,"Analyzed","Analyzed",0
+"iqvK4cSL",3.08333333333333,1.26613875409955,1144,"Analyzed","Analyzed",1
+"iza1HxJ3",3.25,1.27059308185627,1166,"Analyzed","Analyzed",1
+"j6tX4EKm",3.01666666666667,1.63117579165363,791,"Analyzed","Analyzed",1
+"jAn2dHPr",3.23333333333333,1.78853852530416,2654,"Analyzed","Analyzed",0
+"jGlVp7LH",3,1.60507669176294,1512,"Analyzed","Analyzed",4
+"jKhpj6Nw",2.9,1.78220963594092,584,"Analyzed","Analyzed",3
+"jR8kIS8d",2.93333333333333,1.03933920771833,4383,"Analyzed","Analyzed",1
+"jTj8r7IM",3.16666666666667,1.47483600543852,939,"Analyzed","Analyzed",2
+"jW5Hnnpw",3.31666666666667,0.982761013186598,1307,"Analyzed","Analyzed",2
+"jdB2wWWE",3.16666666666667,1.47483600543852,953,"Analyzed","Analyzed",2
+"jejBHrZL",3.25,1.31000064691406,894,"Analyzed","Analyzed",1
+"jmLbrPRF",3.1,1.17458972281778,774,"Analyzed","Analyzed",1
+"jq1tFyPc",2.96666666666667,1.62571149134997,1327,"Analyzed","Analyzed",0
+"js8aH9h5",2.8,1.68543109206568,872,"Analyzed","Analyzed",3
+"k7jhq4UG",3.05,0.94644741632296,872,"Analyzed","Analyzed",1
+"k8oogYSo",3.96666666666667,0.688074362030454,373,"Excluded","Excluded: prior-study criteria",0
+"kPI6Hn70",3.06666666666667,0.880421060026311,1241,"Analyzed","Analyzed",0
+"kidUOmHH",3.18333333333333,1.29525426686007,1377,"Excluded","Excluded: prior-study criteria",0
+"kvyRjZ9D",3.45,1.26792236301915,711,"Excluded","Excluded: prior-study criteria",0
+"kwOQx5GW",3.26666666666667,0.709897740706284,472,"Analyzed","Analyzed",0
+"l8QtnGNW",3.61666666666667,0.884741974578985,269,"Excluded","Excluded: prior-study criteria",0
+"l8ah3uC0",3.45,0.534409225536932,2539,"Excluded","Excluded: choice profile",0
+"lJLpvhXY",3.3,1.71038701141395,2696,"Analyzed","Analyzed",3
+"lJg18jsZ",3,1.93977108556829,583,"Analyzed","Analyzed",2
+"lJzQUkCM",3.86666666666667,1.71203780516894,609,"Analyzed","Analyzed",0
+"lSlDEr1i",4.6,0.588015911234047,265,"Excluded","Excluded: prior-study criteria",0
+"lX52nOhu",2.95,1.51181785289729,1339,"Analyzed","Analyzed",2
+"lcAYxQj6",3.31666666666667,1.04948198144538,5424,"Analyzed","Analyzed",3
+"leFDw0uy",4.1,0.729522713718023,971,"Excluded","Excluded: choice profile",0
+"lmtOtcOK",2.93333333333333,1.52789504771635,859,"Analyzed","Analyzed",3
+"lxNIr6PI",2.95,1.28122028696427,567,"Analyzed","Analyzed",3
+"m5YSW8Fs",3.16666666666667,1.26446433579488,2724,"Analyzed","Analyzed",1
+"mQ0Zz4fe",3.18333333333333,1.26881322725203,463,"Analyzed","Analyzed",4
+"mRHr6TuH",2.66666666666667,1.85642874455655,624,"Analyzed","Analyzed",0
+"mUHLW03m",3.03333333333333,1.20685424767916,2860,"Analyzed","Analyzed",0
+"n03QfmuA",3.05,1.72149914958849,804,"Analyzed","Analyzed",2
+"n1bV105P",2.93333333333333,1.19130560291976,1350,"Analyzed","Analyzed",3
+"n1weTxPD",3.95,0.674599692975554,1135,"Analyzed","Analyzed",3
+"nGzlKsG3",3.15,1.03865950114657,592,"Analyzed","Analyzed",0
+"nLWnkW0q",4.63333333333333,0.485961101416971,1976,"Excluded","Excluded: prior-study criteria",0
+"nVBCASci",2.81666666666667,1.47856626232658,3285,"Analyzed","Analyzed",3
+"nVnEYGLI",2.66666666666667,0.857008329502204,314,"Excluded","Excluded: prior-study criteria",0
+"nci5CrSt",3.5,0.567480306535024,2488,"Analyzed","Analyzed",1
+"ngwEE58V",3.1,1.45788330425091,1558,"Excluded","Excluded: choice profile",1
+"nr2wHMIJ",3.01666666666667,1.30827440581246,916,"Analyzed","Analyzed",2
+"nrxQxjyV",3.43333333333333,1.74051099711362,2398,"Excluded","Excluded: prior-study criteria",1
+"nyBwnA6c",3.23333333333333,1.57702430219623,1244,"Analyzed","Analyzed",4
+"o6rHUH7V",3.26666666666667,1.10264192240253,508,"Analyzed","Analyzed",0
+"oAZoyGLD",3.03333333333333,1.07303887598657,1066,"Analyzed","Analyzed",2
+"oEDc2CL7",3.66666666666667,1.58024527882318,2194,"Analyzed","Analyzed",0
+"oEiP47X0",4.06666666666667,0.709897740706284,627,"Excluded","Excluded: choice profile",0
+"oUWFtBlF",3.5,1.20028245263425,1434,"Analyzed","Analyzed",0
+"oaBRdw8O",4.5,0.676481425202546,312,"Excluded","Excluded: prior-study criteria",0
+"oxsjOulF",2.76666666666667,1.18417054810768,656,"Excluded","Excluded: prior-study criteria",1
+"p2srDx48",2.86666666666667,1.28177137318141,856,"Analyzed","Analyzed",3
+"pAZOPZQE",2.96666666666667,1.79421543844323,7370,"Analyzed","Analyzed",4
+"pAfUl40g",4.1,0.681473975776784,544,"Excluded","Excluded: prior-study criteria",0
+"pEwbYG1Z",2.83333333333333,1.66892502361948,643,"Analyzed","Analyzed",2
+"pRiwJ7lm",3.1,1.34919938595111,1130,"Analyzed","Analyzed",3
+"pfy4Rb1S",2.88333333333333,1.73783097485778,592,"Analyzed","Analyzed",1
+"pn5EKENt",3.35,1.36325880751645,1391,"Excluded","Dropped after DDM fit",2
+"pnxt4S8I",3.53333333333333,0.503097748586463,678,"Analyzed","Analyzed",0
+"poacBEJ0",2.81666666666667,1.30827440581246,931,"Analyzed","Analyzed",2
+"pt9iEWcc",2.86666666666667,1.74148452809146,1102,"Analyzed","Analyzed",2
+"puq7AFVi",3.2,1.38759638541384,1120,"Excluded","Excluded: prior-study criteria",0
+"qAYje89e",4.43333333333333,0.563483916623878,1047,"Analyzed","Analyzed",0
+"qChMpY9X",3.05,1.57765111822844,599,"Analyzed","Analyzed",4
+"qFFIPcCX",2.78333333333333,1.18022788185475,1348,"Analyzed","Analyzed",1
+"qFuO75aq",3.6,1.47521902998866,1231,"Excluded","Excluded: prior-study criteria",0
+"qHDfT6kU",3,0.863575539176746,1704,"Analyzed","Analyzed",4
+"qKCIfZvE",3.7,0.888724090184674,666,"Excluded","Excluded: choice profile",0
+"qM6v7ozT",3.9,0.969011378079462,300,"Excluded","Excluded: prior-study criteria",0
+"qMaGApZJ",3.01666666666667,1.30827440581246,868,"Analyzed","Analyzed",1
+"qZaI08FY",3.13333333333333,1.21385597485188,1192,"Analyzed","Analyzed",1
+"qZk14LDs",2.9,0.986347482346969,612,"Analyzed","Analyzed",0
+"qZpCpXBn",2.98333333333333,1.18595833617427,791,"Excluded","Excluded: choice profile",1
+"qfbpQ5cp",2.8,1.79264032143481,3070,"Analyzed","Analyzed",1
+"quas5qSB",3.21666666666667,1.43906356871483,781,"Analyzed","Analyzed",4
+"qvxb87M7",3.16666666666667,1.26446433579488,733,"Excluded","Excluded: prior-study criteria",4
+"rPZzRp35",2.76666666666667,1.65054348179948,1695,"Analyzed","Analyzed",3
+"rTLUmhEQ",2.98333333333333,0.965360504658649,1106,"Excluded","Excluded: choice profile",1
+"rWUszjX1",3,1.36543281770324,834,"Analyzed","Analyzed",1
+"re3pWWM7",3.53333333333333,1.08090775828509,536,"Analyzed","Analyzed",1
+"rhvhqMRJ",3.08333333333333,1.84383229012953,537,"Excluded","Excluded: prior-study criteria",1
+"rlWX5QVK",4.45,0.501692052213544,1192,"Excluded","Excluded: prior-study criteria",1
+"rnSy7tbr",3.1,1.52604507119614,1201,"Analyzed","Analyzed",2
+"rvM8qDc9",3.16666666666667,1.42812745320537,705,"Analyzed","Analyzed",3
+"sAMumqCo",3.11666666666667,1.02662300883035,1666,"Analyzed","Analyzed",0
+"sJJuXw52",3.73333333333333,1.27381272958646,659,"Analyzed","Analyzed",1
+"sNlOYXhv",2.91666666666667,1.09376765522474,895,"Excluded","Excluded: choice profile",2
+"sR9ZMpw6",4.5,0.504219484089611,1419,"Excluded","Excluded: prior-study criteria",1
+"sabJlnmD",3.5,0.747878355013905,301,"Excluded","Excluded: prior-study criteria",0
+"sdhOAmQL",2.91666666666667,1.56542804745265,1387,"Excluded","Excluded: prior-study criteria",3
+"ss1VWh6H",2.81666666666667,1.03320575119082,527,"Analyzed","Analyzed",4
+"ssbyd1eW",3.48333333333333,0.947640543070027,2885,"Analyzed","Analyzed",2
+"su5FWsT1",2.66666666666667,1.84727620526306,2679,"Analyzed","Analyzed",0
+"swciusTm",3.18333333333333,1.50131768865217,1510,"Analyzed","Analyzed",0
+"t1vgsmPp",2.98333333333333,1.51256507540821,683,"Excluded","Excluded: prior-study criteria",3
+"t9B6DVk8",3.1,1.4225782275711,1128,"Analyzed","Analyzed",0
+"t9JB3V6r",3.13333333333333,1.48970098998021,1508,"Analyzed","Analyzed",0
+"tEUVYMqZ",3.08333333333333,1.04624699204422,517,"Analyzed","Analyzed",0
+"tLNAUFnj",2.41666666666667,1.60815365935298,3612,"Analyzed","Analyzed",0
+"tStDRPDE",2.96666666666667,0.973664520700049,1112,"Excluded","Excluded: choice profile",4
+"tTZWd9tg",3.25,1.65319413483645,816,"Excluded","Excluded: prior-study criteria",0
+"tZFPC8yH",3.7,0.76579414855828,715,"Analyzed","Analyzed",0
+"thcgJPlL",3.03333333333333,1.71698066351082,464,"Excluded","Excluded: prior-study criteria",0
+"thyqekKG",4,0.823386969592618,703,"Analyzed","Analyzed",0
+"tmzIZObn",3.4,1.6692635136389,3168,"Excluded","Excluded: prior-study criteria",1
+"uTC4Igno",2.91666666666667,1.18309657852785,516,"Excluded","Excluded: choice profile",4
+"uaWFKOoQ",2.55,1.63048292731668,309,"Analyzed","Analyzed",0
+"uhms1pCQ",3.28333333333333,0.975838043430184,471,"Analyzed","Analyzed",1
+"vFItGibP",3.31666666666667,1.06550961256259,568,"Analyzed","Analyzed",1
+"vIDQ8JjP",4.4,0.763577663016426,653,"Excluded","Excluded: prior-study criteria",0
+"vr7NuIuu",3.06666666666667,1.85825384289466,880,"Excluded","Excluded: choice profile",0
+"vtKzVL5F",3.1,1.75344696845569,1285,"Analyzed","Analyzed",3
+"vxDHuqME",3.23333333333333,1.68106772634685,1188,"Excluded","Excluded: prior-study criteria",1
+"vzUFtYv8",3.15,1.53848924355758,4073,"Analyzed","Analyzed",1
+"w6D2ikhU",3.15,1.03865950114657,808,"Analyzed","Analyzed",3
+"wH4HCCse",4.65,0.480994731991308,1124,"Excluded","Excluded: choice profile",3
+"wQUeFLq9",2.96666666666667,0.801834055841572,302,"Analyzed","Analyzed",0
+"werHbykY",2.91666666666667,0.94405663911288,1380,"Analyzed","Analyzed",4
+"wj3JyiGD",3.08333333333333,1.04624699204422,549,"Analyzed","Analyzed",1
+"wmqTULLL",3.16666666666667,1.47483600543852,599,"Analyzed","Analyzed",1
+"wwT0zm1q",4.41666666666667,0.561223441609872,533,"Excluded","Excluded: prior-study criteria",0
+"x2R8Hqxa",3.46666666666667,1.25504631107296,904,"Analyzed","Analyzed",3
+"x3XuT1qZ",4.35,0.708902230833954,1247,"Excluded","Excluded: prior-study criteria",0
+"x6Tm8mhX",4.43333333333333,0.532555930592308,1036,"Excluded","Excluded: prior-study criteria",2
+"xDW4WB70",2.73333333333333,1.37614872406091,2331,"Analyzed","Analyzed",0
+"xHEqzgvb",3.06666666666667,1.54992254225998,607,"Analyzed","Analyzed",0
+"xTDQTle7",2.88333333333333,1.43906356871483,731,"Excluded","Excluded: choice profile",3
+"xnl8QeZb",2.83333333333333,1.26446433579488,1508,"Analyzed","Analyzed",4
+"xq1MWUid",3,0.688894963827172,836,"Excluded","Dropped after DDM fit",0
+"y3s0zpF5",3.7,1.12445843838757,462,"Excluded","Excluded: prior-study criteria",0
+"yPMbNlHt",3.08333333333333,1.92478628940644,1950,"Analyzed","Analyzed",1
+"ygjzikhF",1.68333333333333,1.3715223098177,3441,"Analyzed","Analyzed",1
+"ypnkTKUq",2.45,1.43119009385398,515,"Analyzed","Analyzed",2
+"ypzgobey",4,0.823386969592618,300,"Excluded","Excluded: prior-study criteria",0
+"yuecTOZg",3.68333333333333,0.469101798307298,1107,"Excluded","Excluded: prior-study criteria",0
+"yvDNcvbj",3.21666666666667,0.691146595028297,1341,"Analyzed","Analyzed",0
+"yvRoBrMG",2.93333333333333,1.52789504771635,620,"Analyzed","Analyzed",3
+"z3cDS0SR",3.05,0.746176695573474,441,"Excluded","Excluded: prior-study criteria",2
+"z7YfiyEK",3.7,1.53269453655087,916,"Analyzed","Analyzed",3
+"z8K9N96c",2.93333333333333,1.20544902199669,627,"Analyzed","Analyzed",3
+"z9alEUSA",4.61666666666667,0.555150511479076,440,"Excluded","Excluded: prior-study criteria",0
+"zEvRSa7v",2.85,1.13234420112902,612,"Excluded","Excluded: choice profile",0
+"zOjonQKg",3.48333333333333,0.503939284299098,585,"Excluded","Excluded: prior-study criteria",0
+"zXMndgK6",3.16666666666667,1.55319972267931,1208,"Analyzed","Analyzed",2
+"zYZeW5Bl",2.86666666666667,1.29492708605237,907,"Analyzed","Analyzed",2
+"zaB2pVOk",2.95,0.998728004573139,581,"Excluded","Excluded: prior-study criteria",0
+"zadxGyRT",3.33333333333333,0.751646028002829,917,"Excluded","Excluded: prior-study criteria",0
+"zkGQsmgl",2.71666666666667,1.45079366551106,525,"Analyzed","Analyzed",3
+"zlWKUPHc",4.16666666666667,0.668077602989218,613,"Analyzed","Analyzed",1
+"zx2XqRa4",3.46666666666667,1.3587964099216,694,"Analyzed","Analyzed",2

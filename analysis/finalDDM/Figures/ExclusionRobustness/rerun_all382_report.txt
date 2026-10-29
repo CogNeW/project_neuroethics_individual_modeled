@@ -1,0 +1,164 @@
+Loading posterior (large file, please wait)...
+participants fitted by the stDDM: 382
+participants in FINAL_PARTICIPANT_LIST: 376
+added back here: 4BSARJqx, 5pd8VS5F, cLZrBIi5, pn5EKENt, R8pRzMWN, xq1MWUid
+
+==============================================================================
+Re-running the ridge feature-importance analysis
+==============================================================================
+[published 376 list] n after complete.cases = 374
+[all 382 fitted] n after complete.cases = 379
+
+Participants actually analysed:
+  published pipeline: 374   (manuscript reports 374)
+  all-382 pipeline:   379
+  difference:         5
+[published 376 list, different seed] n after complete.cases = 374
+
+==============================================================================
+Model fit per dependent variable
+==============================================================================
+      dv lambda_376 r2_pct_376 lambda_382 r2_pct_382   d_r2
+1  alpha   8.567756 10.7901495   8.345390 11.0162354  0.226
+2 b_gain  20.807489  5.6416537  24.305601  4.9666612 -0.675
+3 b_risk   4.054236 38.9787885   4.079933 39.1615192  0.183
+4   bias 119.955916  0.8835481 140.709627  0.7048766 -0.179
+5  theta   4.589386 27.0505194   4.656477 26.9631835 -0.087
+6   time   4.992803 17.8166977   4.939784 17.5964136 -0.220
+
+==============================================================================
+Do the feature-importance results change?
+==============================================================================
+      dv n_features pearson_r spearman_r top10_overlap top1_376 top1_382
+1   time        224    0.9876     0.9814             7 Berlin31 Berlin31
+2 b_gain        224    0.9834     0.9725            10  BIG5_15  BIG5_10
+3 b_risk        224    0.9876     0.9884             9 Berlin11  BIG5_48
+4  alpha        224    0.9765     0.9647             8  BIG5_13  BIG5_13
+5  theta        224    0.9923     0.9908             9 Berlin21 Berlin21
+6   bias        224    0.9712     0.9452             9  BIG5_13  BIG5_13
+
+==============================================================================
+Top 10 features per dependent variable, side by side
+==============================================================================
+
+--- time ---
+   rank published_376  all_382
+1     1      Berlin31 Berlin31
+2     2       GRiPS_4  BIG5_44
+3     3       BIG5_44  GRiPS_4
+4     4      Berlin11 Berlin11
+5     5       BIG5_48  BIG5_25
+6     6       BIG5_45  BIG5_48
+7     7       BIG5_30  BIG5_58
+8     8          SNS6  BIG5_30
+9     9       BIG5_57  BIG5_45
+10   10       BIG5_60  BIG5_49
+
+--- b_gain ---
+   rank  published_376        all_382
+1     1        BIG5_15        BIG5_10
+2     2        BIG5_40   Spirituality
+3     3   Spirituality        BIG5_15
+4     4        BIG5_10        BIG5_40
+5     5 HumanMindSouls HumanMindSouls
+6     6    Religiosity          MFSQ8
+7     7      MC_Lying1            PT5
+8     8          MFSQ8      MC_Lying1
+9     9          MFSQ2    Religiosity
+10   10            PT5          MFSQ2
+
+--- b_risk ---
+   rank  published_376        all_382
+1     1       Berlin11        BIG5_48
+2     2        BIG5_48       Berlin11
+3     3       Berlin31        BIG5_51
+4     4   Spirituality       Berlin31
+5     5    Religiosity   Spirituality
+6     6 HumanMindSouls        GRiPS_4
+7     7        GRiPS_4        BIG5_14
+8     8        BIG5_14    Religiosity
+9     9        BIG5_51 HumanMindSouls
+10   10        BIG5_11        BIG5_45
+
+--- alpha ---
+   rank          published_376                all_382
+1     1                BIG5_13                BIG5_13
+2     2                    FS1                BIG5_10
+3     3                BIG5_10                    FS1
+4     4                BIG5_60                    FS2
+5     5 educationUndergraduate educationUndergraduate
+6     6                    FS2                BIG5_60
+7     7                 MFSQ24              sexFemale
+8     8                    PT2              MC_Lying1
+9     9              MC_Lying1                 MFSQ24
+10   10           Spirituality                BIG5_20
+
+--- theta ---
+   rank published_376  all_382
+1     1      Berlin21 Berlin21
+2     2        MFSQ22   MFSQ22
+3     3        BIG5_7   BIG5_7
+4     4       GRiPS_4  BIG5_47
+5     5       BIG5_48     SNS7
+6     6          SNS7  GRiPS_8
+7     7       BIG5_47  BIG5_48
+8     8       BIG5_22  BIG5_22
+9     9       BIG5_13  GRiPS_4
+10   10        MFSQ18   MFSQ18
+
+--- bias ---
+   rank published_376  all_382
+1     1       BIG5_13  BIG5_13
+2     2      Berlin21 Berlin21
+3     3          SNS4  BIG5_30
+4     4       BIG5_30     SNS4
+5     5          SNS3     SNS1
+6     6          SNS1  BIG5_40
+7     7          SNS2     SNS3
+8     8       BIG5_40     SNS2
+9     9         MFSQ2    MFSQ2
+10   10       BIG5_44      PT3
+
+==============================================================================
+CONTROL: same 376 people, different seed
+==============================================================================
+If adding the six moves the results no more than simply re-running the
+identical analysis with a different random seed, then the six make no
+detectable difference and the exclusion is immaterial.
+      dv r_376_vs_376_newseed r_376_vs_382 top10_overlap_seed top10_overlap_382
+1   time               0.9964       0.9814                  9                 7
+2 b_gain               0.9893       0.9725                 10                10
+3 b_risk               0.9955       0.9884                  9                 9
+4  alpha               0.9964       0.9647                  9                 8
+5  theta               0.9928       0.9908                  9                 9
+6   bias               0.9973       0.9452                  9                 9
+
+Mean Spearman r, 376 vs the same 376 under a new seed: 0.9946
+Mean Spearman r, 376 vs all 382:                        0.9738
+Mean top-10 overlap, new seed: 9.2 of 10
+Mean top-10 overlap, all 382:  8.7 of 10
+
+==============================================================================
+Rank movement of every feature (how far anything shifts)
+==============================================================================
+      dv median_shift_382 median_shift_newseed max_shift_382 max_shift_newseed
+1   time                6                  3.0            50                19
+2 b_gain                8                  5.5            60                36
+3 b_risk                5                  3.0            34                22
+4  alpha                8                  3.0            61                21
+5  theta                4                  4.0            36                29
+6   bias               12                  2.5            69                18
+
+Read the columns in pairs: rank movement from adding the six versus rank
+movement from nothing but a new random seed on identical data.
+
+==============================================================================
+Conclusion
+==============================================================================
+The six participants were added back and the published pipeline re-run
+unchanged in every other respect, alongside a control that re-runs the
+published 376 under a different random seed.
+
+The ridge feature-importance ranking is itself stochastic, so the honest
+comparison is not 'did anything move' but 'did adding the six move it more
+than the method moves on its own'. The control answers that directly.

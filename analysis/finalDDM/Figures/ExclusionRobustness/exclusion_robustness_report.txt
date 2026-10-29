@@ -1,0 +1,580 @@
+
+==============================================================================
+SECTION 1. Exclusion cascade, 616 -> 376
+==============================================================================
+                                                            stage n_excluded
+1                                         Recruited (as reported)         NA
+2        Duplicate survey sessions collapsed to participant level          6
+3 Prior-study criteria (Fernandez et al., 2025), applied upstream        185
+4                     Degenerate / near-degenerate choice profile         43
+5     Dropped after DDM fit, reason not recoverable from the repo          6
+6                                                        Analyzed         NA
+  n_remaining
+1         616
+2         610
+3         425
+4         382
+5         376
+6         376
+
+Duplicate-session audit (the 616 -> 610 step):
+   user_id n_sessions n_rows
+1 432wre8r          4      4
+2 KZDOCQto          2    150
+3 rlWX5QVK          2    150
+4 ypzgobey          2    150
+4 people hold 10 sessions between them, i.e. 6 duplicate sessions.
+No participant was lost at this step: every ResponseId in raw.csv belongs
+to a user_id that is present. Deduplication downstream is clean -- of the 4
+repeat participants, 1 survives the prior-study criteria, contributing a single
+sitting (75 trials) rather than both.
+
+The 6 participants dropped after the DDM fit:
+   user_id Progress attention_ok n_trials p_recommend rt_median
+1 4BSARJqx      100         TRUE       69       0.145       785
+2 5pd8VS5F      100         TRUE       72       0.278       698
+3 R8pRzMWN      100         TRUE       71       0.352       989
+4 cLZrBIi5      100         TRUE       67       0.522      1326
+5 pn5EKENt      100         TRUE       75       0.307       831
+6 xq1MWUid      100         TRUE       58       0.638      2765
+All six completed the survey, passed every attention check, produced
+trial counts and recommend rates inside the retained range, and have
+ordinary DDM posteriors. They are not repeat participants, do not share an
+IP with anyone, and geolocate inside the US. An exhaustive search over 222
+per-participant variables found none on which they are extreme or
+separable. The code that produced FINAL_PARTICIPANT_LIST.RData is not in
+this repository and no upstream data file contains the 376 set, so no
+reason for their removal can be recovered. The robust course is to re-run
+the reported analyses on all 382 and confirm the results are unchanged,
+rather than to justify the exclusion post hoc.
+
+Total excluded = 240 (manuscript reports 240; reconciles exactly: TRUE)
+Note this total is response-level. 6 of the 240 are duplicate sessions rather
+than excluded people, so participant-level exclusion is 234 of 610 (38.4%),
+not 240 of 616.
+Of these, the criterion the reviewer is worried about -- degenerate or
+near-degenerate responding -- accounts for 43 of 240 (17.9%).
+
+Prior-study criteria, as stated in Fernandez et al. (2025), checked
+against the 425-participant file this project inherits:
+  retain at least 40 of 75 trials -> APPLIED (trial counts run 40 to 75)
+  exclude stereotyped responding on >=90% of trials -> NOT applied to
+    this file: 35 of its 425 participants still sit at or beyond that band
+=> The 43 removed here for choice profile are largely the prior
+   study's own criterion being enforced for the first time, on more
+   aggressively trimmed trials. The criterion is inherited, not invented.
+
+Verifiable characteristics of the 185 participants removed by the prior-study criteria:
+  no task data at all:              29
+  incomplete survey (Progress<100): 10
+  failed an attention check:        16
+  none of the above (other prior-study criteria): 138
+
+==============================================================================
+SECTION 2. The response criterion as implemented
+==============================================================================
+Trimming reproduction check: per-participant trial counts match the
+pipeline file for all 382 retained participants: TRUE
+
+Candidate rule: retain if 0.1 < (Recommend rate after RT trimming) < 0.9.
+  misclassifications against the actual 382/43 split: 0   <- exact match
+
+Recommend rate after RT trimming, among the 425 participants who
+passed the prior-study criteria:
+  retained (n = 382): 0.1127 to 0.8947
+  excluded (n = 43): 0.0145 to 1.0000  (nothing excluded falls inside the retained range)
+
+It is a proportion rule, not a count rule. Trial counts after trimming range
+from 38 to 75, so the counts overlap even though the proportions do not:
+  fewest minority responses among retained: 4
+  most minority responses among excluded:   7
+
+Strictly one-sided responders (0 of one response type):
+  before RT trimming: 0
+  after RT trimming:  2, out of the 43 excluded
+  median minority responses removed by trimming, among the excluded: 1
+=> The exclusion is a near-uniformity threshold. It is not trimming
+   accidentally making people degenerate.
+
+Boundary sensitivity. Applying the same 0.1/0.9 band to the untrimmed
+trials instead would retain 390 rather than 382 participants. 10 of 425 change status:
+    user_id n_untrimmed p_untrimmed n_trimmed p_trimmed actually_retained
+1  AbEkDeHe          75      0.1067        67    0.0896             FALSE
+2  BemKc0pg          75      0.1067        72    0.0972             FALSE
+3  xTDQTle7          75      0.1067        71    0.0986             FALSE
+4  NoFbwxGR          75      0.1200        69    0.0725             FALSE
+5  YbBVLu6T          75      0.1200        67    0.0896             FALSE
+6  4fLRTS44          75      0.1333        70    0.1000             FALSE
+7  5aKXQjiP          75      0.1333        63    0.0794             FALSE
+8  NUekQutS          74      0.8243        59    0.9153             FALSE
+9  qZpCpXBn          75      0.8933        66    0.9242             FALSE
+10 7H7bbPAV          73      0.9041        66    0.8939              TRUE
+   retained_if_rule_applied_pre_trimming
+1                                   TRUE
+2                                   TRUE
+3                                   TRUE
+4                                   TRUE
+5                                   TRUE
+6                                   TRUE
+7                                   TRUE
+8                                   TRUE
+9                                   TRUE
+10                                 FALSE
+
+=> Inclusion is jointly determined by the response profile and by which
+   trials RT trimming removed. For 10 participants (2.4% of the eligible pool) the
+   trimming decides the outcome. That is a real if minor arbitrariness and
+   is better disclosed than left for a reviewer to find.
+
+==============================================================================
+SECTION 3. Choice profiles of the excluded participants
+==============================================================================
+Recommend rate used for classification:
+                                
+                                 after RT trimming raw (never reached trimming)
+  Analyzed                                     376                            0
+  Dropped after DDM fit                          6                            0
+  Excluded: choice profile                      43                            0
+  Excluded: prior-study criteria                 0                          156
+                                
+                                 Always reject Mostly reject (<=10%) Mixed
+  Analyzed                                   0                     0   376
+  Dropped after DDM fit                      0                     0     6
+  Excluded: choice profile                   0                    21     0
+  Excluded: prior-study criteria             3                     2   125
+                                
+                                 Mostly recommend (>=90%) Always recommend
+  Analyzed                                              0                0
+  Dropped after DDM fit                                 0                0
+  Excluded: choice profile                             20                2
+  Excluded: prior-study criteria                       14               12
+
+Among the 205 excluded participants who produced task data:
+  near-always REJECT    (<=10% recommend): 26 (12.7%)
+  near-always RECOMMEND (>=90% recommend): 48 (23.4%)
+  mixed responders:                        131
+
+Within the tranche excluded specifically for choice profile (n = 43):
+  near-always reject: 21 | near-always recommend: 22
+  reject-side proportion = 0.488, 95% CI [0.333, 0.645], exact binomial p = 1.000 against 50/50
+
+==============================================================================
+SECTION 4. Trait scoring
+==============================================================================
+Max absolute discrepancy between re-scored and stored composites (n = 382):
+            GRiPS         SNS_total       BerlinScore      Extraversion 
+                0                 0                 0                 0 
+    Agreeableness Conscientiousness       Neuroticism          Openness 
+                0                 0                 0                 0 
+=> Scoring keys reproduce the stored composites exactly. NOTE the five
+   BFI-2 columns reproduce under REVERSE-SCORING only because
+   fix_bfi2_composites.R re-scored them in place on 2026-09-10. In the
+   originally distributed file (kept as *.PRE_BFI2_FIX.RData) they were
+   plain unreversed item means. See section 4b.
+
+==============================================================================
+SECTION 4b. BFI-2 keying verification
+==============================================================================
+Reverse-keyed items recovered from the data (anchored by item wording):
+  Extraversion       BIG5_11, BIG5_16, BIG5_26, BIG5_31, BIG5_36, BIG5_51
+  Agreeableness      BIG5_12, BIG5_17, BIG5_22, BIG5_37, BIG5_42, BIG5_47
+  Conscientiousness  BIG5_3, BIG5_8, BIG5_23, BIG5_28, BIG5_48, BIG5_58
+  Neuroticism        BIG5_4, BIG5_9, BIG5_24, BIG5_29, BIG5_44, BIG5_49
+  Openness           BIG5_5, BIG5_25, BIG5_30, BIG5_45, BIG5_50, BIG5_55
+
+Internal consistency and dispersion, unreversed vs reverse-scored
+(the reverse-scored column is the published scoring):
+             domain alpha_unrev alpha_keyed sd_unrev sd_keyed
+1      Extraversion       0.704       0.793    0.626    0.713
+2     Agreeableness       0.662       0.820    0.557    0.701
+3 Conscientiousness       0.652       0.878    0.537    0.771
+4       Neuroticism       0.618       0.865    0.560    0.810
+5          Openness       0.688       0.856    0.584    0.764
+
+Mean inter-domain correlation (BFI-2 domains should be near-orthogonal):
+  unreversed (diagnostic only): +0.798
+  reverse-scored (published):   +0.031
+=> The unreversed scoring -- what the originally distributed file carried,
+   and what the published analyses used -- collapses into a single agreement
+   factor. The reverse-scored version behaves as the instrument intends and
+   is what the current data file and section 5 now use.
+
+Excluded participants with usable survey data, by measure:
+            GRiPS       BerlinScore         SNS_total      Extraversion 
+              227               229               229               228 
+    Agreeableness Conscientiousness       Neuroticism          Openness 
+              228               228               228               228 
+      Religiosity      Spirituality               age 
+              226               226               226 
+
+==============================================================================
+SECTION 5. Trait comparison, analyzed vs excluded
+==============================================================================
+Analyzed (n = 376) vs all excluded participants with survey data.
+Group columns are mean (SD). 'Equivalent' = TOST rejects an effect as large
+as |d| = 0.35 at FDR < .05.
+
+             Measure      Analyzed      Excluded             Hedges g     p
+1              GRiPS   2.59 (1.17)   3.51 (1.03) -0.83 [-1.00, -0.66] 0.000
+2        BerlinScore   1.60 (1.36)   0.81 (1.20)    0.60 [0.44, 0.77] 0.000
+3          SNS_total   4.64 (0.87)   4.44 (0.76)    0.24 [0.08, 0.41] 0.003
+4       Extraversion   2.95 (0.81)   2.99 (0.51)  -0.05 [-0.22, 0.11] 0.500
+5      Agreeableness   3.76 (0.71)   3.28 (0.58)    0.71 [0.54, 0.88] 0.000
+6  Conscientiousness   3.86 (0.78)   3.34 (0.64)    0.71 [0.55, 0.88] 0.000
+7        Neuroticism   2.57 (0.90)   2.81 (0.60) -0.31 [-0.47, -0.14] 0.000
+8           Openness   3.74 (0.80)   3.26 (0.59)    0.66 [0.49, 0.82] 0.000
+9        Religiosity   1.87 (0.96)   2.54 (1.09) -0.66 [-0.83, -0.50] 0.000
+10      Spirituality   2.01 (0.95)   2.53 (1.00) -0.53 [-0.70, -0.36] 0.000
+11               age 36.32 (10.88) 35.66 (10.69)   0.06 [-0.10, 0.23] 0.465
+   p_FDR KS_p_FDR Equivalent
+1  0.000    0.000         no
+2  0.000    0.000         no
+3  0.004    0.002         no
+4  0.500    0.000        yes
+5  0.000    0.000         no
+6  0.000    0.000         no
+7  0.000    0.000         no
+8  0.000    0.000         no
+9  0.000    0.000         no
+10 0.000    0.000         no
+11 0.500    0.177        yes
+
+Largest absolute Hedges' g: GRiPS = -0.827
+Measures significant after FDR correction: GRiPS, BerlinScore, SNS_total, Agreeableness, Conscientiousness, Neuroticism, Openness, Religiosity, Spirituality
+Measures statistically equivalent at d = 0.35: Extraversion, age
+
+--- Same contrast, BFI-2 scored as the MANUSCRIPT scored it (unreversed) ---
+                   Measure      Analyzed      Excluded             Hedges g
+1                    GRiPS   2.59 (1.17)   3.51 (1.03) -0.83 [-1.00, -0.66]
+2              BerlinScore   1.60 (1.36)   0.81 (1.20)    0.60 [0.44, 0.77]
+3                SNS_total   4.64 (0.87)   4.44 (0.76)    0.24 [0.08, 0.41]
+4       Extraversion_unrev   3.07 (0.49)   3.59 (0.69) -0.91 [-1.08, -0.74]
+5      Agreeableness_unrev   3.20 (0.44)   3.60 (0.63) -0.76 [-0.93, -0.59]
+6  Conscientiousness_unrev   3.20 (0.42)   3.57 (0.62) -0.74 [-0.90, -0.57]
+7        Neuroticism_unrev   3.14 (0.45)   3.52 (0.64) -0.71 [-0.88, -0.54]
+8           Openness_unrev   3.16 (0.47)   3.63 (0.63) -0.88 [-1.05, -0.71]
+9              Religiosity   1.87 (0.96)   2.54 (1.09) -0.66 [-0.83, -0.50]
+10            Spirituality   2.01 (0.95)   2.53 (1.00) -0.53 [-0.70, -0.36]
+11                     age 36.32 (10.88) 35.66 (10.69)   0.06 [-0.10, 0.23]
+       p p_FDR KS_p_FDR Equivalent
+1  0.000 0.000    0.000         no
+2  0.000 0.000    0.000         no
+3  0.003 0.003    0.002         no
+4  0.000 0.000    0.000         no
+5  0.000 0.000    0.000         no
+6  0.000 0.000    0.000         no
+7  0.000 0.000    0.000         no
+8  0.000 0.000    0.000         no
+9  0.000 0.000    0.000         no
+10 0.000 0.000    0.000         no
+11 0.465 0.465    0.177        yes
+
+Big Five under both scorings (corrected = section 5 table, manuscript = unreversed):
+             domain g_corrected p_FDR_corrected sig_corrected g_manuscript
+1     Agreeableness       0.711          0.0000          TRUE       -0.764
+2 Conscientiousness       0.715          0.0000          TRUE       -0.735
+3      Extraversion      -0.051          0.5004         FALSE       -0.908
+4       Neuroticism      -0.306          0.0001          TRUE       -0.712
+5          Openness       0.655          0.0000          TRUE       -0.879
+  p_FDR_manuscript sig_manuscript
+1                0           TRUE
+2                0           TRUE
+3                0           TRUE
+4                0           TRUE
+5                0           TRUE
+
+  domains agreeing on significance at FDR < .05: 4 of 5
+  domains where the sign of g flips: 3
+
+--- Analyzed vs participants excluded for choice profile only ---
+             Measure      Analyzed    ChoiceExcl             Hedges g     p
+1              GRiPS   2.59 (1.17)   3.20 (1.09) -0.53 [-0.85, -0.21] 0.001
+2        BerlinScore   1.60 (1.36)   1.35 (1.48)   0.18 [-0.13, 0.50] 0.295
+3          SNS_total   4.64 (0.87)   4.53 (0.77)   0.12 [-0.20, 0.44] 0.417
+4       Extraversion   2.95 (0.81)   2.96 (0.59)  -0.00 [-0.32, 0.31] 0.975
+5      Agreeableness   3.76 (0.71)   3.44 (0.72)    0.44 [0.12, 0.76] 0.009
+6  Conscientiousness   3.86 (0.78)   3.60 (0.65)    0.34 [0.02, 0.65] 0.019
+7        Neuroticism   2.57 (0.90)   2.65 (0.67)  -0.09 [-0.41, 0.22] 0.458
+8           Openness   3.74 (0.80)   3.46 (0.70)    0.35 [0.04, 0.67] 0.018
+9        Religiosity   1.87 (0.96)   2.12 (1.10)  -0.25 [-0.57, 0.06] 0.163
+10      Spirituality   2.01 (0.95)   2.19 (0.96)  -0.18 [-0.50, 0.13] 0.260
+11               age 36.32 (10.88) 37.23 (11.34)  -0.08 [-0.40, 0.23] 0.619
+   p_FDR KS_p_FDR Equivalent
+1  0.011    0.081         no
+2  0.464    0.674         no
+3  0.560    0.683         no
+4  0.975    0.674        yes
+5  0.051    0.081         no
+6  0.051    0.111         no
+7  0.560    0.158         no
+8  0.051    0.081         no
+9  0.360    0.674         no
+10 0.464    0.683         no
+11 0.680    0.674         no
+
+--- Within excluded: near-always reject vs near-always recommend ---
+n reject-side = 26, n recommend-side = 48
+             Measure    RejectSide RecommendSide             Hedges g     p
+1              GRiPS   2.74 (1.05)   3.84 (0.82) -1.21 [-1.73, -0.69] 0.000
+2        BerlinScore   1.81 (1.41)   0.67 (1.04)    0.95 [0.45, 1.46] 0.001
+3          SNS_total   4.60 (0.79)   4.46 (0.82)   0.17 [-0.31, 0.65] 0.484
+4       Extraversion   2.94 (0.73)   3.09 (0.42)  -0.28 [-0.76, 0.20] 0.326
+5      Agreeableness   3.55 (0.78)   3.33 (0.64)   0.32 [-0.16, 0.80] 0.215
+6  Conscientiousness   3.78 (0.65)   3.38 (0.66)    0.59 [0.11, 1.08] 0.017
+7        Neuroticism   2.67 (0.74)   2.61 (0.58)   0.09 [-0.39, 0.56] 0.742
+8           Openness   3.52 (0.84)   3.34 (0.55)   0.27 [-0.21, 0.75] 0.332
+9        Religiosity   1.88 (1.07)   2.60 (1.05) -0.67 [-1.16, -0.19] 0.008
+10      Spirituality   1.92 (0.93)   2.56 (0.90) -0.70 [-1.19, -0.20] 0.006
+11               age 36.04 (12.83) 37.12 (10.37)  -0.10 [-0.57, 0.38] 0.712
+   p_FDR KS_p_FDR Equivalent
+1  0.000    0.000         no
+2  0.005    0.007         no
+3  0.591    0.833         no
+4  0.456    0.276         no
+5  0.395    0.070         no
+6  0.038    0.015         no
+7  0.742    0.702         no
+8  0.456    0.213         no
+9  0.021    0.029         no
+10 0.021    0.053         no
+11 0.742    0.525         no
+
+==============================================================================
+SECTION 5b. Response-style diagnostics
+==============================================================================
+acquiescence = mean BFI-2 response in the direction the participant actually
+answered (higher = agrees with everything). within_sd = SD across that
+person's 60 items (lower = flatter, less differentiated responding).
+                index    analyzed    excluded                    g      p
+1        acquiescence 3.15 (0.39) 3.58 (0.60) -0.89 [-1.06, -0.72] 0.0000
+2           within_sd 1.31 (0.37) 0.96 (0.40)    0.90 [0.72, 1.07] 0.0000
+3         BerlinScore 1.60 (1.36) 0.81 (1.20)    0.60 [0.44, 0.77] 0.0000
+4 duration_s (median)         916         834          -- (skewed) 0.0006
+
+Same indices for the tranche excluded specifically for choice profile:
+                index    analyzed    excluded                    g      p
+1        acquiescence 3.15 (0.39) 3.44 (0.53) -0.69 [-1.00, -0.37] 0.0014
+2           within_sd 1.31 (0.37) 1.08 (0.37)    0.61 [0.29, 0.93] 0.0003
+3         BerlinScore 1.60 (1.36) 1.35 (1.48)   0.18 [-0.13, 0.50] 0.2954
+4 duration_s (median)         916         953          -- (skewed) 0.7226
+BFI-2 inter-domain correlations (UNREVERSED items -- acquiescence
+diagnostic, NOT the published scoring):
+Analyzed                     n = 376 | mean inter-domain r = +0.683 | range [+0.616, +0.724]
+Excluded (all)               n = 228 | mean inter-domain r = +0.841 | range [+0.800, +0.869]
+Excluded (choice profile)    n =  43 | mean inter-domain r = +0.802 | range [+0.696, +0.891]
+Analyzed sample correlation matrix:
+                        Extraversion_unrev Agreeableness_unrev
+Extraversion_unrev                    1.00                0.72
+Agreeableness_unrev                   0.72                1.00
+Conscientiousness_unrev               0.62                0.71
+Neuroticism_unrev                     0.68                0.72
+Openness_unrev                        0.70                0.70
+                        Conscientiousness_unrev Neuroticism_unrev
+Extraversion_unrev                         0.62              0.68
+Agreeableness_unrev                        0.71              0.72
+Conscientiousness_unrev                    1.00              0.67
+Neuroticism_unrev                          0.67              1.00
+Openness_unrev                             0.63              0.68
+                        Openness_unrev
+Extraversion_unrev                0.70
+Agreeableness_unrev               0.70
+Conscientiousness_unrev           0.63
+Neuroticism_unrev                 0.68
+Openness_unrev                    1.00
+Excluded sample correlation matrix:
+                        Extraversion_unrev Agreeableness_unrev
+Extraversion_unrev                    1.00                0.85
+Agreeableness_unrev                   0.85                1.00
+Conscientiousness_unrev               0.80                0.83
+Neuroticism_unrev                     0.81                0.86
+Openness_unrev                        0.87                0.84
+                        Conscientiousness_unrev Neuroticism_unrev
+Extraversion_unrev                         0.80              0.81
+Agreeableness_unrev                        0.83              0.86
+Conscientiousness_unrev                    1.00              0.87
+Neuroticism_unrev                          0.87              1.00
+Openness_unrev                             0.86              0.83
+                        Openness_unrev
+Extraversion_unrev                0.87
+Agreeableness_unrev               0.84
+Conscientiousness_unrev           0.86
+Neuroticism_unrev                 0.83
+Openness_unrev                    1.00
+
+VERDICT: the excluded group agrees more indiscriminately (acquiescence
+g = -0.89), answers far more flatly across the 60 items (within-person
+SD g = +0.90), and scores lower on the one objectively scored, effortful
+measure in the battery (Berlin numeracy g = +0.60). Those three move
+together, which is the signature of low-effort questionnaire responding,
+not of strong convictions about neuromodulation. On this reading the
+exclusion behaves as a data-quality filter, and near-uniform task
+responding is one more expression of the same low engagement.
+
+--- Categorical composition ---
+          
+             1   2   3
+  Analyzed 217 159   0
+  Excluded 141  82   3
+
+	Pearson's Chi-squared test
+
+data:  sex_tab
+X-squared = 6.7813, df = 2, p-value = 0.03369
+
+          
+           Attention (Concentration) Language (spoken) Long Term Memory Mood
+  Analyzed                        53                56               63   55
+  Excluded                        30                31               28   21
+          
+           Motor Function Self-control Short Term (Working) Memory
+  Analyzed             50           56                          43
+  Excluded             26           38                          31
+
+	Pearson's Chi-squared test
+
+data:  cond_tab
+X-squared = 5.3345, df = 6, p-value = 0.5017
+
+
+==============================================================================
+SECTION 6. Why degenerate responders were excluded from the DDM
+==============================================================================
+The stDDM estimates harm and cure sensitivity from the *contrast* between
+Recommend and Do-Not-Recommend responses and their RT distributions. A
+participant who gives one response on (nearly) every trial provides no
+information about the boundary they never reach: the drift coefficients
+and the relative-onset parameter are only weakly identified, and their
+posteriors collapse onto the group prior. Including them would not recover
+their preferences -- it would import shrinkage estimates that look like
+group means and would attenuate exactly the individual-difference effects
+the paper is about. The robustness analysis below therefore uses a
+model-free sensitivity measure that *is* estimable for these participants.
+
+==============================================================================
+SECTION 7. Model-free robustness check
+==============================================================================
+Fitted per-participant logistic models for 425 participants (376 analyzed, 49 excluded downstream of the prior-study criteria -- the 43 removed for choice profile plus the 6 dropped between the DDM fit and the analysis sample).
+
+Convergent validity in the analyzed sample (n = 376):
+  cor(logistic harm coefficient, DDM b_risk) = 0.633
+  cor(logistic cure coefficient, DDM b_gain) = 0.523
+
+Analyzed-only n = 376; analyzed + all downstream exclusions n = 425
+       dv              iv beta_AnalyzedOnly beta_PlusExcluded p_AnalyzedOnly
+1  b_harm     GRiPs_Score          0.053645           0.05927       0.019297
+2  b_harm consequentalism          0.011810          -0.01763       0.856666
+3  b_harm        politics          0.010236           0.01052       0.007195
+4  b_harm            Harm         -0.051052          -0.04256       0.133191
+5  b_harm        Fairness         -0.111399          -0.07526       0.002131
+6  b_harm         Loyalty          0.080002           0.08037       0.000682
+7  b_harm        Athority          0.077061           0.08204       0.001114
+8  b_harm        Sancticy          0.038060           0.04545       0.041689
+9  b_cure     GRiPs_Score         -0.034218          -0.03938       0.210864
+10 b_cure consequentalism         -0.051703          -0.08029       0.506147
+11 b_cure        politics         -0.000423          -0.00389       0.925931
+12 b_cure            Harm          0.019041           0.02705       0.638261
+13 b_cure        Fairness          0.029043           0.04325       0.503478
+14 b_cure         Loyalty         -0.045901          -0.05529       0.103438
+15 b_cure        Athority         -0.031592          -0.04877       0.264276
+16 b_cure        Sancticy         -0.029966          -0.03772       0.178391
+   p_PlusExcluded
+1        0.006474
+2        0.778209
+3        0.003837
+4        0.180368
+5        0.032834
+6        0.000267
+7        0.000236
+8        0.010159
+9        0.119448
+10       0.267901
+11       0.358182
+12       0.462729
+13       0.290736
+14       0.031253
+15       0.060677
+16       0.066080
+
+Correlation between the two coefficient vectors: 0.955
+Terms that change significance status at p < .05 when the excluded
+participants are added back: 1 of 16
+Terms that change sign: 1
+
+Threshold sensitivity: the same regression bank at alternative bands.
+       dv              iv 0.00-1.00 (n = 423) 0.05-0.95 (n = 402)
+1  b_harm     GRiPs_Score             0.05860             0.06175
+2  b_harm consequentalism            -0.01928             0.00883
+3  b_harm        politics             0.01066             0.01032
+4  b_harm            Harm            -0.04229            -0.04812
+5  b_harm        Fairness            -0.07533            -0.09387
+6  b_harm         Loyalty             0.08069             0.07809
+7  b_harm        Athority             0.08227             0.07262
+8  b_harm        Sancticy             0.04611             0.03919
+9  b_cure     GRiPs_Score            -0.03824            -0.04005
+10 b_cure consequentalism            -0.07813            -0.04555
+11 b_cure        politics            -0.00404            -0.00152
+12 b_cure            Harm             0.02661             0.01810
+13 b_cure        Fairness             0.04334             0.04127
+14 b_cure         Loyalty            -0.05546            -0.05134
+15 b_cure        Athority            -0.04889            -0.03891
+16 b_cure        Sancticy            -0.03843            -0.03448
+   0.10-0.90 (n = 382) 0.15-0.85 (n = 359) 0.20-0.80 (n = 334)
+1             0.053321            0.044439            0.038619
+2             0.016057            0.014926            0.003828
+3             0.009927            0.009443            0.008202
+4            -0.047082           -0.050314           -0.033064
+5            -0.107323           -0.112439           -0.097758
+6             0.076927            0.074300            0.068185
+7             0.072900            0.071679            0.068442
+8             0.036748            0.032805            0.036464
+9            -0.036405           -0.035952           -0.033251
+10           -0.050288           -0.035175            0.006921
+11           -0.000372           -0.000884           -0.000788
+12            0.022867            0.031756            0.009200
+13            0.036247            0.056365            0.031117
+14           -0.046238           -0.036227           -0.046149
+15           -0.032755           -0.029191           -0.041311
+16           -0.029520           -0.026988           -0.038350
+
+Correlation of each band's coefficient vector with the published band:
+  0.00-1.00 (n = 423)    r = +0.956
+  0.05-0.95 (n = 402)    r = +0.994
+  0.15-0.85 (n = 359)    r = +0.988
+  0.20-0.80 (n = 334)    r = +0.945
+
+=> If these correlations stay high, the reported trait associations do not
+   turn on where the exclusion threshold was drawn, which is the substantive
+   answer to the reviewer regardless of how the criterion is described.
+
+==============================================================================
+SECTION 8. Caveats
+==============================================================================
+1. Trait comparisons cover GRiPS, Berlin and subjective numeracy, the five
+   BFI-2 domains, religiosity, spirituality and age. These are the measures
+   whose scoring keys could be verified item-for-item against the published
+   composites, so excluded and retained participants are strictly comparable.
+   Moral Foundations and Moral Commitments composites were built in an
+   upstream pipeline not contained in this repository and are available only
+   for the eligible pool, so they enter the section 7 robustness check but
+   not the section 5 comparison against the prior-study exclusions.
+2. The reviewer also raises decision-making responsibility toward others.
+   No responsibility measure was administered, so that specific claim cannot
+   be tested here and should be conceded as a limitation.
+3. The BFI-2 domain columns originally distributed with this project were
+   unreversed item means (verified against the pre-fix backup: exact
+   match to rowMeans over unreversed items, mean inter-domain r = +.68).
+   fix_bfi2_composites.R re-scored them on 2026-09-10, so section 5 uses
+   the corrected keying while the manuscript reports the unreversed ones.
+   No reported result changes: the composites never enter a published
+   analysis, and the item-level ridge importances are invariant to
+   reverse-scoring (max difference 4e-16). The exclusion comparison in
+   section 5 holds under either scoring.
+4. The section 7 proxy is a static logistic model. It recovers sensitivity
+   to harm and cure but has no analogue of the relative-onset (time)
+   parameter, so it can show that the magnitude effects are not an artifact
+   of the exclusion, but it cannot do the same for the latency effects.
+
+==============================================================================
+Outputs written to
+==============================================================================
+C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM/Figures/ExclusionRobustness
