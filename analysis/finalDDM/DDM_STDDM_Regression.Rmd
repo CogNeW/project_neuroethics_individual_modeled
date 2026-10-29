@@ -16,6 +16,10 @@ library(data.table)
 
 ```{r}
 load("C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM/NeuroethicsPosteriorAndPredictions.RData")
+
+# unique_idxP_table (the 376 retained participants) is needed from here on;
+# it is defined only inside FINAL_PARTICIPANT_LIST.RData.
+load("C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM/FINAL_PARTICIPANT_LIST.RData")
 ```
 
 # Compute Correlations between Parameters
@@ -39,12 +43,15 @@ filtered_dt <- m1_posterior[, ..target_cols]
 posterior_means <- filtered_dt[, lapply(.SD, mean), .SDcols = target_cols]
 
 # Step 2: Convert to long format to extract participant IDs and metric names
-long <- melt(posterior_means, variable.name = "metric", value.name = "mean_value")
+# NOTE: melt/dcast are namespace-qualified because PaperFigures.Rmd attaches
+# reshape2, which masks the data.table versions if both notebooks share one R
+# session. reshape2::melt returns a plain data.frame, so the `:=` below fails.
+long <- data.table::melt(posterior_means, variable.name = "metric", value.name = "mean_value")
 long[, c("base_metric", "participant_id") := tstrsplit(metric, "\\[|\\]", perl = TRUE)]
 long[, base_metric := gsub("\\.p", "", base_metric)]
 
 # Step 3: Cast to wide format (one row per participant)
-wide <- dcast(long, participant_id ~ base_metric, value.var = "mean_value")
+wide <- data.table::dcast(long, participant_id ~ base_metric, value.var = "mean_value")
 
 # Step 4: Compute correlation matrix
 cor_matrix <- cor(wide[, -1, with = FALSE], use = "pairwise.complete.obs")
@@ -151,7 +158,7 @@ plan(multisession) # Use multiple cores for parallel execution
 # Define the variable patterns to group by
 variable_groups <- c("time\\[", "b_gain\\.p\\[", "b_risk\\.p\\[", "alpha\\.p\\[", "bias\\[", "theta\\.p\\[")
 
-col_names <- c("Time", "Gain Weight", "Risk Weight", "Alpha", "Bias", "Theta")
+col_names <- c("Time", "Cure Weight", "Harm Weight", "Alpha", "Bias", "Theta")
 
 # Function to calculate individual summaries for a given variable group
 compute_individual_summaries <- function(group_pattern) {
@@ -226,13 +233,15 @@ for (i in seq_along(variable_groups)) {
       ) +
       scale_fill_manual(
         values = c("#4272c4", "#e97d2d"),
-        labels = c("Benefits First", "Risks First"),
-        name = "Latency"
+        # Harm was always displayed on the left, so s is the onset of the left (harm)
+        # attribute relative to the right (cure) attribute, not a harm-vs-cure order per se
+        labels = c("Cure (right) earlier", "Harm (left) earlier"),
+        name = "Relative onset"
       ) +
       geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
       labs(
-        title = paste(col_name, "Posterior Distribution"),
-        x = "Mean",
+        title = "Relative Attribute Onset",
+        x = "Relative onset of harm vs. cure (s)",
         y = "Density"
       ) +
       scale_y_continuous(expand = c(0, 0)) +
@@ -279,8 +288,8 @@ for (i in seq_along(variable_groups)) {
   }
   
   # Save the plot to a file
-  # file_name <- paste0("Figures/", gsub(" ", "_", col_name), "_posterior_distribution.png")
-  # ggsave(file_name, plot = plot, dpi = 300, width = 8, height = 6)
+  file_name <- paste0("Figures/", gsub(" ", "_", col_name), "_posterior_distribution.png")
+  ggsave(file_name, plot = plot, dpi = 300, width = 8, height = 6)
 }
 ```
 
@@ -328,9 +337,9 @@ plot <- ggplot(plot_data, aes(x = Risk, y = Gain, color = Color)) +
   geom_abline(slope = 1, intercept = 0, linetype = "dotted", color = "black") +
   scale_color_manual(values = c("Above" = "#4272c4", "Below" = "#e97d2d")) +
   labs(
-    x = "Risk Weight",
-    y = "Benefit Weight",
-    title = "Risk vs Benefit Weighing\nAcross Participants",
+    x = "Harm Weight",
+    y = "Cure Weight",
+    title = "Harm vs Cure Weighing\nAcross Participants",
     color = "Position"
   ) +
   theme_classic() + # Use a classic theme with a white background
@@ -476,6 +485,92 @@ final_table$MC_Steril <- factor(final_table$MC_Steril)
 ```
 
 
+# Trial-Level Choice Analysis
+
+Inferential test for the Figure 4 latency plots. Mixed-effects logistic regression of each
+trial's choice on the participant-level stDDM parameters (posterior means, z-scored across the
+376 retained participants) plus the harm and cure probabilities shown on that trial.
+
+b_risk is multiplied by -1 before z-scoring so that higher = more harm-sensitive (raw b_risk is
+mostly negative, so a larger raw value means LESS harm-sensitive). Positive latency = harm first.
+
+The predictors are posterior point estimates, so the CIs do not propagate DDM uncertainty and are
+anticonservative.
+
+```{r}
+library(dplyr)
+library(lme4)
+
+retained_idxP <- unique_idxP_table[[grep("idx", names(unique_idxP_table), ignore.case = TRUE)[1]]]
+posterior_mean <- function(fmt) sapply(retained_idxP, function(i) mean(m1_posterior[[sprintf(fmt, i)]]))
+
+choice_params <- data.frame(
+  idxP   = retained_idxP,
+  time   = posterior_mean("time[%d]"),
+  b_risk = posterior_mean("b_risk.p[%d]"),
+  b_gain = posterior_mean("b_gain.p[%d]")
+) %>%
+  mutate(
+    latency_z   = scale(time)[, 1],
+    harm_sens_z = scale(-b_risk)[, 1],  # sign-reversed: higher = more harm-sensitive
+    cure_sens_z = scale(b_gain)[, 1]
+  )
+
+choice_data <- risk_data %>%
+  mutate(
+    response = ifelse(experimental_treatment_selected == "Yes to treatment", 1, 0),
+    harm_c = risk / 100 - mean(risk / 100),
+    cure_c = gain / 100 - mean(gain / 100)
+  ) %>%
+  inner_join(choice_params, by = "idxP")
+
+cat("Trials:", nrow(choice_data), " Participants:", n_distinct(choice_data$idxP), "\n")
+
+glmer_ctrl <- glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
+fit_choice <- function(interactions) {
+  f <- as.formula(paste(
+    "response ~ harm_c + cure_c + latency_z + harm_sens_z + cure_sens_z",
+    interactions, "+ (1 + harm_c + cure_c | idxP)"
+  ))
+  glmer(f, data = choice_data, family = binomial, control = glmer_ctrl)
+}
+
+# Primary model: both latency x sensitivity interactions
+choice_full      <- fit_choice("+ latency_z:harm_sens_z + latency_z:cure_sens_z")
+# Comparison models (Supplemental Table)
+choice_harm_only <- fit_choice("+ latency_z:harm_sens_z")
+choice_cure_only <- fit_choice("+ latency_z:cure_sens_z")
+choice_no_int    <- fit_choice("")
+
+coef_table <- function(m) {
+  s  <- summary(m)$coefficients
+  ci <- confint(m, method = "Wald")[rownames(s), ]
+  data.frame(term = rownames(s), beta = s[, 1], se = s[, 2], z = s[, 3], p = s[, 4],
+             ci_lower = ci[, 1], ci_upper = ci[, 2], OR = exp(s[, 1]), row.names = NULL)
+}
+
+choice_full_table <- coef_table(choice_full)
+print(choice_full_table, digits = 3)
+
+choice_model_comparison <- data.frame(
+  model = c("No interactions", "Latency x harm only", "Latency x cure only", "Both (primary)"),
+  AIC = sapply(list(choice_no_int, choice_harm_only, choice_cure_only, choice_full), AIC),
+  BIC = sapply(list(choice_no_int, choice_harm_only, choice_cure_only, choice_full), BIC)
+)
+print(choice_model_comparison)
+print(anova(choice_harm_only, choice_full))
+print(anova(choice_cure_only, choice_full))
+
+# The primary fit is singular (random intercept correlates ~ -.93 with the harm slope).
+# Robustness check: same fixed effects with uncorrelated random effects (non-singular).
+choice_full_uncorr <- glmer(
+  response ~ harm_c + cure_c + latency_z * (harm_sens_z + cure_sens_z) + (1 + harm_c + cure_c || idxP),
+  data = choice_data, family = binomial, control = glmer_ctrl
+)
+print(coef_table(choice_full_uncorr), digits = 3)
+```
+
+
 # Ridge Regression
 
 ```{r}
@@ -538,8 +633,8 @@ compute_feature_importance <- function(data, response, predictors,
   importance_scores <- colMeans(feature_importance, na.rm = TRUE)
   importance_se <- apply(feature_importance, 2, function(x) sd(x, na.rm = TRUE) / sqrt(n_subsets))
   
-   # Adjust importance scores by feature frequency
   adjusted_importance_scores <- importance_scores * feature_frequencies
+  # adjusted_importance_scores <- importance_scores
   
   # Return a sorted dataframe with importance scores and standard errors
   importance_df <- data.frame(
@@ -569,7 +664,8 @@ column_names = colnames(final_table)
 # Remove unwanted columns (explicitly removing 'X')
 predictors <- column_names[
   !grepl("^(participant_id|user_id|rt|key_press|trial_index|time_elapsed|condition|condition_per_trial|total_trials|treatment_display|risk|gain|no_effect|experimental_treatment_selected|Progress|Duration..in.seconds.|RecordedDate|ResponseId|attention_check|Q1802|Income|Major|EmploymentStatus)", column_names) &
-  column_names != "X" # Explicitly exclude the 'X' column
+  column_names != "X" & # Explicitly exclude the 'X' column
+  !column_names %in% c("MFSQ6", "MFSQ22") # MFQ catch items ("good at math", "better to do good"), not trait content
 ]
 
 final_table <- final_table[complete.cases(final_table[, ..predictors])]
@@ -588,6 +684,8 @@ data_matrix <- model.matrix(independent_formula, data = final_table)[, -1]  # Dr
 coef_list <- list()
 # List to store the importance data frames for each response variable
 importance_results <- list()
+# lambda.min per parameter, reused by the nested-CV chunk for its in-sample column
+ridge_lambdas <- list()
 
 for (dep_var in dependent_vars) {
   print(dep_var)
@@ -597,6 +695,7 @@ for (dep_var in dependent_vars) {
   # Perform cross-validated ridge regression
   cv_fit <- cv.glmnet(data_matrix, y, alpha = 0)  # Ridge regression (alpha = 0)
   best_lambda <- cv_fit$lambda.min
+  ridge_lambdas[[dep_var]] <- best_lambda
   ridge_model <- glmnet(data_matrix, y, alpha = 0, lambda = best_lambda)
 
   # Make predictions
@@ -639,6 +738,140 @@ coefficients_table <- Reduce(function(dt1, dt2) merge(dt1, dt2, by = "Predictor"
 
 # Melt the data.table for easier plotting
 melted_coefs <- melt(coefficients_table, id.vars = "Predictor", variable.name = "Dependent_Variable", value.name = "Beta_Weight")
+```
+
+Save the ridge inputs so the resubmission robustness analyses (step1_robustness.Rmd) can run
+without re-executing this notebook.
+
+```{r}
+save(final_table, data_matrix, predictors, dependent_vars, ridge_lambdas, coefficients_table,
+     importance_results, file = "ridge_inputs.RData")
+```
+
+## Out-of-Sample R² (Nested Cross-Validation)
+
+The "variance explained" printed in the loop above is in-sample: cv.glmnet only picks lambda, then
+the model is refit on everyone and R² is computed on those same participants. This chunk reports
+held-out R² instead. Outer loop: 10 folds of participants are held out one at a time. Inner loop:
+cv.glmnet picks lambda using the training folds only. R² is computed from the pooled held-out
+predictions. The whole procedure is repeated over 10 random fold splits.
+
+Uses `data_matrix`, `final_table` and `dependent_vars` from the chunk above.
+
+```{r}
+library(glmnet)
+library(data.table)
+
+set.seed(1234)
+n_outer_folds <- 10
+n_repeats <- 10
+
+nested_cv_r2 <- function(x, y, n_folds) {
+  outer_folds <- sample(rep(seq_len(n_folds), length.out = length(y)))
+  held_out_pred <- numeric(length(y))
+  for (k in seq_len(n_folds)) {
+    test <- outer_folds == k
+    inner_fit <- cv.glmnet(x[!test, , drop = FALSE], y[!test], alpha = 0)
+    held_out_pred[test] <- predict(inner_fit, newx = x[test, , drop = FALSE], s = "lambda.min")
+  }
+  1 - sum((y - held_out_pred)^2) / sum((y - mean(y))^2)
+}
+
+ridge_r2_results <- rbindlist(lapply(dependent_vars, function(dep_var) {
+  y <- as.numeric(scale(final_table[[dep_var]]))
+
+  # In-sample R², using the same lambda as the loop above so it matches the reported numbers.
+  # (A fresh cv.glmnet call here would draw different folds and a different lambda.)
+  full_fit <- glmnet(data_matrix, y, alpha = 0, lambda = ridge_lambdas[[dep_var]])
+  in_sample <- 1 - sum((y - predict(full_fit, newx = data_matrix))^2) / sum((y - mean(y))^2)
+
+  outer_r2 <- replicate(n_repeats, nested_cv_r2(data_matrix, y, n_outer_folds))
+  data.table(
+    parameter        = dep_var,
+    in_sample_R2     = in_sample,
+    nested_cv_R2     = mean(outer_r2),
+    nested_cv_R2_min = min(outer_r2),
+    nested_cv_R2_max = max(outer_r2)
+  )
+}))
+
+print(ridge_r2_results[, lapply(.SD, function(v) if (is.numeric(v)) round(100 * v, 2) else v)])
+save(ridge_r2_results, file = "ridge_nested_cv_r2.RData")
+```
+
+## Behavioral Benchmark (Nested CV)
+
+Do the stDDM parameters carry trait information beyond plain behavioral summaries? Same trait
+matrix, same nested CV, but the outcomes are simple per-participant summaries of the choice data:
+
+- endorsement rate (proportion of trials recommending treatment)
+- mean RT and RT SD (seconds)
+- logistic slopes on displayed harm and cure probability (one penalized logistic regression per
+  participant, `arm::bayesglm`, which tolerates near-separation; harm slope sign-reversed so
+  higher = more harm-avoidant)
+
+Uses `nested_cv_r2`, `data_matrix`, `final_table`, `dependent_vars` and `ridge_r2_results` from the
+chunks above. `risk_data` still has RT in ms and probabilities in percent here.
+
+```{r}
+library(dplyr)
+library(data.table)
+# arm is called as arm::bayesglm rather than attached: attaching it loads MASS, which masks
+# dplyr::select for every later chunk.
+
+behavior_slopes <- function(d) {
+  fit <- arm::bayesglm(response ~ harm + cure, data = d, family = binomial)
+  c(harm_slope = -unname(coef(fit)["harm"]), cure_slope = unname(coef(fit)["cure"]))
+}
+
+behavioral_summaries <- risk_data %>%
+  mutate(
+    response = ifelse(experimental_treatment_selected == "Yes to treatment", 1, 0),
+    harm = risk / 100,
+    cure = gain / 100,
+    rt_s = rt / 1000
+  ) %>%
+  group_by(user_id) %>%
+  group_modify(~ data.frame(
+    endorsement_rate = mean(.x$response),
+    mean_rt = mean(.x$rt_s),
+    sd_rt = sd(.x$rt_s),
+    t(behavior_slopes(.x))
+  )) %>%
+  ungroup()
+
+behavior_vars <- c("endorsement_rate", "mean_rt", "sd_rt", "harm_slope", "cure_slope")
+
+# Align to the rows of data_matrix (final_table after complete.cases)
+behavior_aligned <- as.data.frame(final_table[, .(user_id)]) %>%
+  left_join(behavioral_summaries, by = "user_id")
+stopifnot(nrow(behavior_aligned) == nrow(data_matrix), !anyNA(behavior_aligned[, behavior_vars]))
+
+set.seed(1234)
+behavior_r2_results <- rbindlist(lapply(behavior_vars, function(v) {
+  y <- as.numeric(scale(behavior_aligned[[v]]))
+  outer_r2 <- replicate(n_repeats, nested_cv_r2(data_matrix, y, n_outer_folds))
+  data.table(outcome = v, nested_cv_R2 = mean(outer_r2),
+             nested_cv_R2_min = min(outer_r2), nested_cv_R2_max = max(outer_r2))
+}))
+
+benchmark_table <- rbind(
+  ridge_r2_results[, .(outcome = parameter, type = "stDDM parameter",
+                       nested_cv_R2, nested_cv_R2_min, nested_cv_R2_max)],
+  behavior_r2_results[, .(outcome, type = "Behavioral summary",
+                          nested_cv_R2, nested_cv_R2_min, nested_cv_R2_max)]
+)
+print(benchmark_table[, lapply(.SD, function(v) if (is.numeric(v)) round(100 * v, 2) else v)])
+
+# How much of each stDDM parameter is just a behavioral summary?
+param_behavior_cor <- cor(
+  as.data.frame(final_table)[, dependent_vars],
+  behavior_aligned[, behavior_vars]
+)
+print(round(param_behavior_cor, 2))
+
+save(behavioral_summaries, behavior_r2_results, benchmark_table, param_behavior_cor,
+     file = "behavioral_benchmark_r2.RData")
 ```
 
 Plot Results
@@ -704,7 +937,10 @@ for (dependent_var_name in dependent_vars) {
 
 ## Read the results
 ```{r}
-load("C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM/RidgeResults.RData")
+# ridge_inputs.RData is written by the ridge chunk above. (RidgeResults.RData is a stale
+# Sept 2025 copy that still includes the MFQ catch items; loading it would overwrite
+# the current importance_results.)
+load("C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM/ridge_inputs.RData")
 question_text = read.csv("C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/data/text_key.csv")
 ```
 
@@ -783,6 +1019,7 @@ category_mapping <- list(
   "Optimize" = "Optimize",
   "Human Mind" = "HumanMind"
 )
+test_level_mapping <- category_mapping   # 12 test categories, used by the save chunk below
 
 # Define parameter names with expressions for rendering
 measure_names <- c(
@@ -798,6 +1035,8 @@ measure_names <- c(
 get_category <- function(feature_name) {
   for(cat_name in names(category_mapping)) {
     patterns <- category_mapping[[cat_name]]
+    # Bare item names ("BIG5_1", "MFSQ1") must match exactly; unanchored, "BIG5_1" also matches BIG5_10-19
+    patterns <- ifelse(grepl("^[A-Za-z0-9_]+[0-9]$", patterns), paste0("^", patterns, "$"), patterns)
     if(any(sapply(patterns, function(p) grepl(p, feature_name)))) {
       return(cat_name)
     }
@@ -835,6 +1074,8 @@ category_mapping <- list(
 get_category <- function(feature_name) {
   for(cat_name in names(category_mapping)) {
     patterns <- category_mapping[[cat_name]]
+    # Bare item names ("BIG5_1", "MFSQ1") must match exactly; unanchored, "BIG5_1" also matches BIG5_10-19
+    patterns <- ifelse(grepl("^[A-Za-z0-9_]+[0-9]$", patterns), paste0("^", patterns, "$"), patterns)
     if(any(sapply(patterns, function(p) grepl(p, feature_name)))) {
       return(cat_name)
     }
@@ -898,7 +1139,6 @@ category_mapping <- list(
   "Moral Foundations - Loyalty" = c("MFSQ3", "MFSQ9", "MFSQ14", "MFSQ19", "MFSQ25", "MFSQ30"),
   "Moral Foundations - Authority" = c("MFSQ4", "MFSQ10", "MFSQ15", "MFSQ20", "MFSQ26", "MFSQ31"),
   "Moral Foundations - Purity" = c("MFSQ5", "MFSQ11", "MFSQ16", "MFSQ21", "MFSQ27", "MFSQ32"),
-  "Moral Foundations - Unclassified" = c("MFSQ6", "MFSQ22"),
   "Religious & Spiritual" = c("^Religion", "^AttendChurch", "Spirituality", "Religiosity", "^ReligiousActivity", "meditation"),
   "Risk Taking (GRiPS)" = "^GRiPS_",
   "Interpersonal Reactivity - Perspective Taking" = "^PT", 
@@ -920,7 +1160,7 @@ category_mapping <- list(
   "Demographics_age" = "age",
   "Demographics_sex" = "^sex",
   "Demographics_race_ethnicity" = "race_ethnicity",
-  "Demographics_education" = c("^education", "YearofEducation"),
+  "Demographics_education" = c("^education", "YearOfEducation"),
   "Moral Commitments - Lying" = "MC_Lying",
   "Moral Commitments - Assassin" = "MC_Assassin",
   "Moral Commitments - Torture" = "MC_Torture",
@@ -932,6 +1172,7 @@ category_mapping <- list(
   "Optimize" = "Optimize",
   "Human Mind" = "HumanMind"
 )
+factor_level_mapping <- category_mapping   # 43 factors, used by the save chunk
 
 # Define parameter names with expressions for rendering
 measure_names <- c(
@@ -947,6 +1188,8 @@ measure_names <- c(
 get_category <- function(feature_name) {
   for(cat_name in names(category_mapping)) {
     patterns <- category_mapping[[cat_name]]
+    # Bare item names ("BIG5_1", "MFSQ1") must match exactly; unanchored, "BIG5_1" also matches BIG5_10-19
+    patterns <- ifelse(grepl("^[A-Za-z0-9_]+[0-9]$", patterns), paste0("^", patterns, "$"), patterns)
     if(any(sapply(patterns, function(p) grepl(p, feature_name)))) {
       return(cat_name)
     }
@@ -1008,6 +1251,8 @@ measure_names <- c(
 get_category <- function(feature_name) {
   for(cat_name in names(category_mapping)) {
     patterns <- category_mapping[[cat_name]]
+    # Bare item names ("BIG5_1", "MFSQ1") must match exactly; unanchored, "BIG5_1" also matches BIG5_10-19
+    patterns <- ifelse(grepl("^[A-Za-z0-9_]+[0-9]$", patterns), paste0("^", patterns, "$"), patterns)
     if(any(sapply(patterns, function(p) grepl(p, feature_name)))) {
       return(cat_name)
     }
@@ -1076,6 +1321,33 @@ measures <- c("time", "b_gain", "b_risk", "alpha", "theta", "bias")
 results <- setNames(lapply(measures, function(measure) {
   run_permutation_test(importance_results[[measure]], measure)
 }), measures)
+```
+
+## Save Permutation Results for Figures
+
+`results` above uses whichever `category_mapping` chunk ran last. This chunk runs both groupings
+explicitly and saves them under the names `PaperFigures.Rmd` loads (object `final_factor_results`).
+Needs `test_level_mapping` and `factor_level_mapping` from the "Get Cluster Labels" and
+"Get Factorized Cluster Labels" chunks.
+
+```{r}
+# Guard against item-to-factor misassignment (unanchored item names once put BIG5_10-19
+# into Extraversion and MFSQ10-19 into Harm)
+category_mapping <- factor_level_mapping
+assigned <- table(sapply(colnames(data_matrix), get_category))
+stopifnot(
+  !"Other" %in% names(assigned),
+  all(assigned[grep("^BIG5 - ", names(assigned))] == 12),
+  all(assigned[grep("^Moral Foundations - ", names(assigned))] == 6)
+)
+
+for (level in c("test", "factor")) {
+  category_mapping <- get(paste0(level, "_level_mapping"))   # read by get_category()
+  final_factor_results <- setNames(lapply(measures, function(measure) {
+    run_permutation_test(importance_results[[measure]], measure)
+  }), measures)
+  save(final_factor_results, file = sprintf("permutation_test_%s_level.RData", level))
+}
 ```
 
 
@@ -1269,11 +1541,28 @@ and p-values can be extracted efficiently.
 # Load necessary libraries
 library(dplyr)
 
+# The composite ideological scores (GRiPs_Score, consequentalism, the moral-foundation
+# subscales) are NOT in the final_table built earlier in this notebook -- that one holds
+# raw questionnaire items. They live in final_ddm_ideological_combined.RData. Load that
+# into a separate object so the subscore regression below can keep using final_table,
+# which is where the raw MFSQ / GRiPS / Berlin items actually are.
+ideological_env <- new.env()
+load('final_ddm_ideological_combined.RData', envir = ideological_env)
+ideological_table <- ideological_env$final_table
+
+# `politics` was commented out further down this notebook, but the published run
+# included it. Recompute it with the formula from that commented line.
+ideological_table$politics <- ideological_table$republican + ideological_table$conservative -
+                              ideological_table$democrat - ideological_table$liberal
+
 # Define dependent and independent variables
 dependent_vars <- c("time", "b_gain", "b_risk", "alpha", "theta", "bias")
-independent_vars <- c("condition", "GRIPS", "consequentalism", "politics", 
-                      "Harm", "Fairness", "Loyalty", "Authority", "Sanctity", 
-                      "sex", "poly(age, 2, raw=TRUE)", "BerlinScore", "ReligiousFactor")
+# Reproduces the variable set behind the published Figure 3: the saved
+# final_ddm_regression_results.RData contains exactly these terms. GRIPS is named
+# GRiPs_Score in the ideological table; BerlinScore, age and ReligiousFactor were
+# added to this vector after the last successful run and are excluded here.
+independent_vars <- c("condition", "GRiPs_Score", "consequentalism", "politics",
+                      "Harm", "Fairness", "Loyalty", "Authority", "Sanctity", "sex")
 
 # Initialize an empty data frame to store the results
 results <- data.frame(Independent_Var = character(), 
@@ -1290,7 +1579,7 @@ for(dep_var in dependent_vars) {
     formula <- as.formula(paste(dep_var, "~", ind_var))
     
     # Run the linear regression
-    model <- lm(formula, data = final_table)
+    model <- lm(formula, data = ideological_table)
     
     # Extract the beta coefficient and p-value (ignoring intercept)
     summary_model <- summary(model)
@@ -1334,7 +1623,7 @@ library(dplyr)
 
 # Define dependent and independent variables
 dependent_vars <- c("time", "b_gain", "b_risk", "alpha", "theta", "bias")
-independent_vars <- c("MFSQ1", "MFSQ2", "MFSQ3", "MFSQ4", "MFSQ5", "MFSQ6", "MFSQ7", "MFSQ8", "MFSQ9", "MFSQ10", "MFSQ11", "MFSQ12", "MFSQ13", "MFSQ14", "MFSQ15", "MFSQ16", "MFSQ17", "MFSQ18", "MFSQ19", "MFSQ20", "MFSQ21", "MFSQ22", "MFSQ23", "MFSQ24", "MFSQ25", "MFSQ26", "MFSQ27", "MFSQ28", "MFSQ29", "MFSQ30", "MFSQ31", "MFSQ32", "GRiPS_1", "GRiPS_2", "GRiPS_3", "GRiPS_4", "GRiPS_5", "GRiPS_6", "GRiPS_7", "GRiPS_8", "Berlin1", "Berlin2", "Berlin3", "Berlin4"  )
+independent_vars <- c("MFSQ1", "MFSQ2", "MFSQ3", "MFSQ4", "MFSQ5", "MFSQ7", "MFSQ8", "MFSQ9", "MFSQ10", "MFSQ11", "MFSQ12", "MFSQ13", "MFSQ14", "MFSQ15", "MFSQ16", "MFSQ17", "MFSQ18", "MFSQ19", "MFSQ20", "MFSQ21", "MFSQ23", "MFSQ24", "MFSQ25", "MFSQ26", "MFSQ27", "MFSQ28", "MFSQ29", "MFSQ30", "MFSQ31", "MFSQ32", "GRiPS_1", "GRiPS_2", "GRiPS_3", "GRiPS_4", "GRiPS_5", "GRiPS_6", "GRiPS_7", "GRiPS_8", "Berlin1", "Berlin2", "Berlin3", "Berlin4"  )
 
 # Initialize an empty data frame to store the results
 subscore_results <- data.frame(Independent_Var = character(), 
@@ -1381,6 +1670,14 @@ for(dep_var in dependent_vars) {
 # Print or inspect the results
 print(subscore_results)
 ```
+
+```{r}
+# Figure 3 in PaperFigures.Rmd needs BOTH of these tables, and needs the T_Value
+# column. final_ddm_regression_results.RData on disk is stale: it was written before
+# T_Value was added to the loop above, so it holds only Beta and P_Value. Re-save
+# both tables here so the figure script can load them instead of depending on a
+# live workspace.
+save(results, subscore_results, file = 'regression_results_for_figures.RData')
 
 ## Correlating Metrics to Each Other
 

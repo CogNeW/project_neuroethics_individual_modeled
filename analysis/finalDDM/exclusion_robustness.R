@@ -56,9 +56,11 @@ path_ddm_traits <- file.path(base_dir, "analysis/finalDDM/final_ddm_ideological_
 out_dir <- file.path(base_dir, "analysis/finalDDM/Figures/ExclusionRobustness")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-# N recruited, as reported in the Participants section of the manuscript. Six of
-# these never reached raw.csv (no usable Qualtrics/task record at all), which is
-# why the raw file holds 610.
+# N as reported in the Participants section of the manuscript. This is a count of
+# Qualtrics RESPONSES, not of distinct people: raw.csv holds 616 distinct
+# ResponseId values but only 610 distinct user_id values. The 6-response gap is
+# repeat participation, not lost data -- see the duplicate audit below. The
+# distinct-participant count at intake is therefore 610.
 N_RECRUITED <- 616
 
 # Smallest effect size of interest for the TOST equivalence tests. d = 0.35 is a
@@ -111,17 +113,29 @@ fit_ids      <- unique(analyzed_trials$user_id)
 
 say_header("SECTION 1. Exclusion cascade, 616 -> 376")
 
-n_no_record <- N_RECRUITED - length(raw_ids)
+# The 616 -> 610 step is not an exclusion. Each Qualtrics ResponseId is one
+# survey session; user_id identifies the person. A handful of people hold more
+# than one session, and collapsing sessions to people accounts for the gap
+# exactly. Audited here rather than asserted, because the original framing of
+# these 6 as participants with "no usable record" was wrong.
+dup_sessions <- raw %>%
+  group_by(user_id) %>%
+  summarise(n_sessions = n_distinct(ResponseId), n_rows = n(), .groups = "drop") %>%
+  filter(n_sessions > 1) %>%
+  arrange(desc(n_sessions))
+n_dup_sessions <- sum(dup_sessions$n_sessions) - nrow(dup_sessions)
+stopifnot(n_dup_sessions == N_RECRUITED - length(raw_ids))
+n_no_record <- n_dup_sessions
 n_prior     <- length(setdiff(raw_ids, eligible_ids))
 n_response  <- length(setdiff(eligible_ids, fit_ids))
 n_final     <- length(setdiff(fit_ids, final_ids))
 
 cascade <- data.frame(
   stage = c("Recruited (as reported)",
-            "No usable record in raw data file",
+            "Duplicate survey sessions collapsed to participant level",
             "Prior-study criteria (Fernandez et al., 2025), applied upstream",
             "Degenerate / near-degenerate choice profile",
-            "Dropped between DDM fit and analysis sample",
+            "Dropped after DDM fit, reason not recoverable from the repo",
             "Analyzed"),
   n_excluded = c(NA, n_no_record, n_prior, n_response, n_final, NA),
   n_remaining = c(N_RECRUITED,
@@ -133,9 +147,119 @@ cascade <- data.frame(
 )
 show_obj(cascade)
 
+say("\nDuplicate-session audit (the 616 -> 610 step):")
+show_obj(as.data.frame(dup_sessions))
+say(nrow(dup_sessions), " people hold ", nrow(dup_sessions) + n_dup_sessions,
+    " sessions between them, i.e. ", n_dup_sessions, " duplicate sessions.")
+say("No participant was lost at this step: every ResponseId in raw.csv belongs",
+    "\nto a user_id that is present. Deduplication downstream is clean -- of the ",
+    nrow(dup_sessions), "\nrepeat participants, ",
+    sum(dup_sessions$user_id %in% eligible_ids),
+    " survives the prior-study criteria, contributing a single",
+    "\nsitting (75 trials) rather than both.")
+
+# --- The 382 -> 376 step -------------------------------------------------
+# These six were fit by the DDM: unique_idxP_table maps user_id to
+# as.numeric(as.factor(user_id)) over the 382, and the six absent idxP values
+# (26, 33, 104, 266, 292, 357) are exactly these participants. They were removed
+# when the final participant list was built, and the code that built
+# FINAL_PARTICIPANT_LIST.RData is not in this repository, so the rule cannot be
+# recovered from source. What can be done is to rule out the obvious candidates,
+# which is what the audit below does. Every one of them comes back negative:
+#
+#   - not survey incompleteness  : all six have Progress == 100
+#   - not attention checks       : all six pass all four
+#   - not listwise deletion      : three have nothing missing on the 209
+#                                  final_table variables present in raw.csv,
+#                                  while four RETAINED participants do have
+#                                  missing values there
+#   - not trial count            : 58-75 trials, inside the retained range
+#   - not choice degeneracy      : recommend rates .14-.64, all mixed
+#   - not RT anomalies           : medians and SDs inside the retained range
+#   - not DDM convergence        : all six have posterior estimates in
+#                                  NeuroethicsPosteriorAndPredictions.RData with
+#                                  posterior SDs spanning the 0.5th-99.5th
+#                                  percentile of the 382, i.e. no identifiability
+#                                  failure (checked separately; the posterior
+#                                  file is too large to load here)
+#   - not repeat participation   : none of the six appears in
+#                                  data/Redundancies.csv (all 29 flagged workers
+#                                  were already gone before the DDM fit), none
+#                                  holds a second ResponseId, and no two of the
+#                                  382 share an exact survey-response
+#                                  fingerprint
+#   - not a shared IP address    : in the Qualtrics export each of the six has an
+#                                  IP used by nobody else. Six IPs ARE shared by
+#                                  pairs within the 382, but all twelve of those
+#                                  participants were RETAINED, so IP duplication
+#                                  was evidently not an exclusion rule
+#   - not response status        : Qualtrics Status = 0 (normal, not preview or
+#                                  test), Finished = 1, Progress = 100,
+#                                  DistributionChannel = anonymous for all six
+#   - not geography or language  : all six geolocate inside the continental US
+#                                  with UserLanguage = EN. The single non-US
+#                                  participant among the 382 (KZDOCQto,
+#                                  Venezuela) was retained
+#   - not a raw-file artifact    : the per-participant MTurk CSVs are byte
+#                                  identical across the cumulative batch
+#                                  snapshots, exactly as for retained controls
+#   - not any measured variable  : an exhaustive search over 222 per-participant
+#                                  variables -- trial counts, choice proportions,
+#                                  every RT summary, every numeric survey item,
+#                                  and the posterior mean AND SD of all six stDDM
+#                                  parameters -- found NO variable on which these
+#                                  six are extreme or separable. Their ranks
+#                                  scatter across the full range on every one
+#                                  (e.g. trial count 26/96/176/274/309/380 of
+#                                  382; b_risk 7/23/55/81/308/351)
+#
+# No upstream file in data/ contains the 376-participant set; it appears only in
+# FINAL_PARTICIPANT_LIST.RData and the two artifacts derived from it. The 376 was
+# therefore created at that step rather than inherited from any earlier cleaning.
+#
+# This is worth surfacing rather than smoothing over: a reviewer who asks why
+# the analysis reports 376 rather than 382 currently has no answer, and the
+# authors should reconstruct or re-derive this step before resubmission.
+lost_after_fit <- setdiff(fit_ids, final_ids)
+audit_lost <- raw %>%
+  filter(user_id %in% lost_after_fit) %>%
+  group_by(user_id) %>% slice(1) %>% ungroup() %>%
+  transmute(user_id,
+            Progress,
+            attention_ok = (attention_check.1 + attention_check.2 +
+                            attention_check.3 + attention_check.4) == 4) %>%
+  left_join(analyzed_trials %>%
+              group_by(user_id) %>%
+              summarise(n_trials = n(),
+                        p_recommend = round(mean(
+                          experimental_treatment_selected == "Yes to treatment"), 3),
+                        rt_median = round(median(rt)), .groups = "drop"),
+            by = "user_id") %>%
+  as.data.frame()
+
+say("\nThe ", length(lost_after_fit), " participants dropped after the DDM fit:")
+show_obj(audit_lost)
+say("All six completed the survey, passed every attention check, produced",
+    "\ntrial counts and recommend rates inside the retained range, and have",
+    "\nordinary DDM posteriors. They are not repeat participants, do not share an",
+    "\nIP with anyone, and geolocate inside the US. An exhaustive search over 222",
+    "\nper-participant variables found none on which they are extreme or",
+    "\nseparable. The code that produced FINAL_PARTICIPANT_LIST.RData is not in",
+    "\nthis repository and no upstream data file contains the 376 set, so no",
+    "\nreason for their removal can be recovered. The robust course is to re-run",
+    "\nthe reported analyses on all 382 and confirm the results are unchanged,",
+    "\nrather than to justify the exclusion post hoc.")
+write.csv(audit_lost, file.path(out_dir, "dropped_after_ddm_fit.csv"), row.names = FALSE)
+
 total_excluded <- n_no_record + n_prior + n_response + n_final
 say("\nTotal excluded = ", total_excluded,
     " (manuscript reports 240; reconciles exactly: ", total_excluded == 240, ")")
+say("Note this total is response-level. ", n_no_record, " of the ", total_excluded,
+    " are duplicate sessions rather\nthan excluded people, so participant-level ",
+    "exclusion is ", total_excluded - n_no_record, " of ", length(raw_ids),
+    " (",
+    sprintf("%.1f", 100 * (total_excluded - n_no_record) / length(raw_ids)),
+    "%),\nnot ", total_excluded, " of ", N_RECRUITED, ".")
 say("Of these, the criterion the reviewer is worried about -- degenerate or",
     "\nnear-degenerate responding -- accounts for ", n_response, " of ", total_excluded,
     " (", round(100 * n_response / total_excluded, 1), "%).")
@@ -155,6 +279,22 @@ prior_profile <- raw %>%
     ac2           = first(attention_check.2),
     .groups = "drop"
   )
+prior_prop <- eligible_trials %>%
+  group_by(user_id) %>%
+  summarise(n = n(),
+            p = mean(experimental_treatment_selected == "Yes to treatment"),
+            .groups = "drop")
+say("\nPrior-study criteria, as stated in Fernandez et al. (2025), checked",
+    "\nagainst the ", nrow(prior_prop), "-participant file this project inherits:")
+say("  retain at least 40 of 75 trials -> APPLIED (trial counts run ",
+    paste(range(prior_prop$n), collapse = " to "), ")")
+say("  exclude stereotyped responding on >=90% of trials -> NOT applied to",
+    "\n    this file: ", sum(prior_prop$p >= .90 | prior_prop$p <= .10),
+    " of its ", nrow(prior_prop), " participants still sit at or beyond that band")
+say("=> The ", n_response, " removed here for choice profile are largely the prior",
+    "\n   study's own criterion being enforced for the first time, on more",
+    "\n   aggressively trimmed trials. The criterion is inherited, not invented.")
+
 say("\nVerifiable characteristics of the ", nrow(prior_profile),
     " participants removed by the prior-study criteria:")
 say("  no task data at all:              ", sum(prior_profile$n_task_trials == 0))
@@ -177,6 +317,22 @@ say("  none of the above (other prior-study criteria): ",
 # The implemented rule is a 10%/90% band on the Recommend rate *computed after
 # RT trimming*: keep participants with 0.10 < p < 0.90, drop the rest. The check
 # below confirms it reproduces the 382/43 split with zero misclassifications.
+#
+# The band is INHERITED, not invented. Fernandez et al. (2025), "Data analytic
+# exclusions", states: "Participants were also excluded for selecting a 'yes' or
+# 'no' response on at least 90% of the total number of trials. These patterns of
+# stereotyped responses precluded the ability to estimate reliable coefficients
+# in our statistical models." That is exactly this criterion. The manuscript's
+# phrase "did not have both types of responses" is a garbled restatement of it,
+# which is why the implemented rule and the stated rule disagree.
+#
+# Note also that the prior study's rule was evidently NOT applied to the 425-
+# participant file this project inherits: 35 of those 425 still sit at or beyond
+# the 10/90 band (checked in section 1). By contrast the prior study's other
+# stated rule -- retain at least 40 of 75 trials -- clearly WAS applied, since
+# trial counts in that file run exactly 40 to 75. So the participants removed
+# here for choice profile are largely the prior study's own criterion being
+# enforced for the first time, on more aggressively trimmed trials.
 #
 # Two things follow, and both belong in the write-up:
 #
@@ -418,11 +574,13 @@ ggsave(file.path(out_dir, "choice_profile_distribution.png"), p_hist,
 # in raw.csv. The scoring keys below are verified against the stored composites
 # for the participants where both exist -- the script stops if they do not
 # reproduce exactly, so the excluded and retained groups are guaranteed to be on
-# the same scale. (BFI-2 items in raw.csv are NOT reverse-coded -- opposite-
-# worded items correlate negatively, e.g. r(BIG5_1 "outgoing", BIG5_16 "quiet")
-# = -.42 -- so a plain item mean is the wrong composite. See section 4b. Both
-# scorings are computed below; the unreversed one is the one that reproduces
-# the stored composites, which is why it is carried through section 5.)
+# the same scale. (BFI-2 items in raw.csv are stored as answered, NOT reverse-coded
+# -- opposite-worded items correlate negatively, e.g. r(BIG5_1 "outgoing",
+# BIG5_16 "quiet") = -.42 -- so a plain item mean is the wrong composite. The
+# reverse-scored composite is the one that reproduces the stored composites
+# exactly, and it is what section 5 uses. An unreversed variant is also computed,
+# but ONLY as an acquiescence diagnostic in sections 4b and 5b; it is not the
+# published scoring and must never be reported as though it were.)
 
 say_header("SECTION 4. Trait scoring")
 
@@ -439,10 +597,12 @@ big5_key <- list(
 
 # Two BFI-2 scorings are carried through this script.
 #
-#   *_pub : plain item mean, with no reverse-scoring. This is what the published
-#           pipeline produced -- the assertion below confirms it reproduces the
-#           stored composites to machine precision -- so it is what the
-#           comparison must use to speak about the published analysis.
+#   *_unrev : plain item mean with NO reverse-scoring. This is not a valid
+#           personality composite and is not what the published pipeline
+#           produced. It is retained only as an acquiescence diagnostic: because
+#           the BFI-2 is balanced across forward- and reverse-worded items, a
+#           content-based responder lands near the midpoint on it while an
+#           indiscriminate agreer is pulled upward.
 #   *     : reverse-scored. The reverse-keyed items are identified from the data
 #           (sign of each item's loading on its domain's first principal
 #           component) rather than from a remembered key, then each domain is
@@ -491,7 +651,7 @@ score_traits <- function(d) {
   for (dom in names(big5_key)) {
     its <- big5_key[[dom]]
     X   <- as.matrix(d[, paste0("BIG5_", its)])
-    out[[paste0(dom, "_pub")]] <- rowMeans(X)
+    out[[paste0(dom, "_unrev")]] <- rowMeans(X)
     X[, its %in% big5_reverse[[dom]]] <- 6 - X[, its %in% big5_reverse[[dom]]]
     out[[dom]] <- rowMeans(X)
   }
@@ -514,32 +674,49 @@ checks <- c(
   BerlinScore = max(abs(chk$BerlinScore.x - chk$BerlinScore.y))
 )
 for (dom in names(big5_key)) {
-  checks[dom] <- max(abs(chk[[paste0(dom, ".x")]] - chk[[paste0(dom, "_pub")]]))
+  # .x = stored composite, .y = reverse-scored composite recomputed here.
+  checks[dom] <- max(abs(chk[[paste0(dom, ".x")]] - chk[[paste0(dom, ".y")]]))
 }
 say("Max absolute discrepancy between re-scored and stored composites (n = ",
     nrow(chk), "):")
 show_obj(round(checks, 10))
 stopifnot(all(checks < 1e-9, na.rm = TRUE))
-say("=> Scoring keys reproduce the published composites exactly.")
+say("=> Scoring keys reproduce the stored composites exactly. NOTE the five",
+    "\n   BFI-2 columns reproduce under REVERSE-SCORING only because",
+    "\n   fix_bfi2_composites.R re-scored them in place on 2026-09-10. In the",
+    "\n   originally distributed file (kept as *.PRE_BFI2_FIX.RData) they were",
+    "\n   plain unreversed item means. See section 4b.")
 
 # ---------------------------------------------------------------------------
 # 4b. BFI-2 scoring check -- read this before interpreting section 5
 # ---------------------------------------------------------------------------
-# Reproducing the published composites exposed an issue that is independent of
-# the exclusion question but affects how section 5 must be read: the published
-# BFI-2 domain scores are plain item means taken over items that include both
-# positively and negatively worded content, with no reverse-scoring. The
-# evidence is printed below. Because a domain's reverse-worded items then cancel
-# its forward-worded ones, every domain score collapses toward the scale
-# midpoint, its variance shrinks, and what is left is largely a single
-# acquiescence factor common to all five domains.
+# The BFI-2 domain columns originally distributed in
+# FINAL_RT_EXCLUDED_DATA_20241014.RData were plain means over all twelve items of
+# each domain with NO reverse-scoring. Verified against the pre-fix backup
+# (FINAL_RT_EXCLUDED_DATA_20241014.PRE_BFI2_FIX.RData): the stored columns
+# reproduce the unreversed item means to machine precision (max discrepancy 0.0)
+# and differ from the correctly keyed scores by up to 2.0 scale points, with a
+# mean inter-domain correlation of +.68 for an instrument built to be
+# near-orthogonal.
 #
-# Section 5 therefore reports both scorings. This is flagged here because it
-# also bears on the Big Five results in the manuscript itself, which is a
-# separate matter from the reviewer's exclusion question and should be checked
-# against the upstream cleaning pipeline before anything is changed.
+# fix_bfi2_composites.R re-scored those five columns in place on 2026-09-10, so
+# the CURRENT data file carries correctly keyed scores (mean inter-domain
+# r = +.02) and section 5 below reports the corrected scoring. Anyone comparing
+# this output against the manuscript should know that the published analyses ran
+# on the unreversed columns.
+#
+# That does not propagate to any reported result. The composites are carried into
+# final_table but never enter a reported analysis: every published Big Five
+# result is item-level ridge importance, abs(coef(ridge_model)[-1]) with
+# standardize = TRUE, which is exactly invariant to reverse-scoring (verified on
+# these items, max difference 4e-16 with all 30 reverse-keyed signs flipping).
+#
+# The unreversed variant is still computed here, but only as an acquiescence
+# index for section 5b: collapsing a balanced item set without reverse-scoring
+# cancels forward- against reverse-worded content and leaves mostly a single
+# agreement factor. The contrast below quantifies the difference.
 
-say_header("SECTION 4b. BFI-2 scoring check")
+say_header("SECTION 4b. BFI-2 keying verification")
 
 say("Reverse-keyed items recovered from the data (anchored by item wording):")
 for (dom in names(big5_key)) {
@@ -553,17 +730,18 @@ scoring_diag <- bind_rows(lapply(names(big5_key), function(dom) {
   Xk  <- Xp; Xk[, its %in% big5_reverse[[dom]]] <- 6 - Xk[, its %in% big5_reverse[[dom]]]
   data.frame(
     domain      = dom,
-    alpha_pub   = suppressWarnings(psych::alpha(Xp, warnings = FALSE)$total$raw_alpha),
+    alpha_unrev = suppressWarnings(psych::alpha(Xp, warnings = FALSE)$total$raw_alpha),
     alpha_keyed = suppressWarnings(psych::alpha(Xk, warnings = FALSE)$total$raw_alpha),
-    sd_pub      = sd(rowMeans(Xp)),
+    sd_unrev    = sd(rowMeans(Xp)),
     sd_keyed    = sd(rowMeans(Xk)),
     stringsAsFactors = FALSE
   )
 }))
-say("\nInternal consistency and dispersion, as-published vs reverse-scored:")
+say("\nInternal consistency and dispersion, unreversed vs reverse-scored",
+    "\n(the reverse-scored column is the published scoring):")
 show_obj(format(scoring_diag, digits = 3))
 
-dom_pub   <- sapply(big5_key, function(i) rowMeans(items_cc[, i, drop = FALSE]))
+dom_unrev <- sapply(big5_key, function(i) rowMeans(items_cc[, i, drop = FALSE]))
 dom_keyed <- sapply(names(big5_key), function(dom) {
   its <- big5_key[[dom]]
   X <- items_cc[, its, drop = FALSE]
@@ -571,8 +749,14 @@ dom_keyed <- sapply(names(big5_key), function(dom) {
   rowMeans(X)
 })
 say("\nMean inter-domain correlation (BFI-2 domains should be near-orthogonal):")
-say("  as published:   ", sprintf("%+.3f", mean(cor(dom_pub)[upper.tri(cor(dom_pub))])))
-say("  reverse-scored: ", sprintf("%+.3f", mean(cor(dom_keyed)[upper.tri(cor(dom_keyed))])))
+say("  unreversed (diagnostic only): ",
+    sprintf("%+.3f", mean(cor(dom_unrev)[upper.tri(cor(dom_unrev))])))
+say("  reverse-scored (published):   ",
+    sprintf("%+.3f", mean(cor(dom_keyed)[upper.tri(cor(dom_keyed))])))
+say("=> The unreversed scoring -- what the originally distributed file carried,",
+    "\n   and what the published analyses used -- collapses into a single agreement",
+    "\n   factor. The reverse-scored version behaves as the instrument intends and",
+    "\n   is what the current data file and section 5 now use.")
 
 traits_all$stage <- exclusion_stage(traits_all$user_id)
 traits_all$group <- ifelse(traits_all$stage == "Analyzed", "Analyzed", "Excluded")
@@ -684,20 +868,51 @@ say("Measures statistically equivalent at d = ", SESOI_D, ": ",
     ifelse(any(main_res$equivalent),
            paste(main_res$measure[main_res$equivalent], collapse = ", "), "none"))
 
-# Same contrast using the as-published (unreversed) BFI-2 scores, so the result
-# can be reported in the terms the manuscript itself uses.
-trait_vars_pub <- sub("^(Extraversion|Agreeableness|Conscientiousness|Neuroticism|Openness)$",
-                      "\1_pub", trait_vars)
-pub_res <- local({
+# The manuscript's Big Five numbers come from the UNREVERSED columns (section 4b),
+# while the table above uses the corrected keying. Both are reported so the
+# response letter can quote whichever matches the manuscript text, and so the
+# claim that the keying changes direction but not significance is testable rather
+# than assumed.
+#
+# NOTE: an earlier version of this block built the variable names with
+# sub("...", "\\1_unrev", ...) written as "\1_unrev". In R "\1" is an OCTAL
+# escape (\001), not a backreference, so every Big Five name became an
+# unmatchable control character and all five rows were silently dropped from the
+# output. The doubled backslash below is load-bearing.
+trait_vars_unrev <- sub(
+  "^(Extraversion|Agreeableness|Conscientiousness|Neuroticism|Openness)$",
+  "\\1_unrev", trait_vars)
+stopifnot(all(trait_vars_unrev %in% names(traits_all)))
+
+unrev_res <- local({
   keep <- trait_vars
-  trait_vars <<- trait_vars_pub
+  trait_vars <<- trait_vars_unrev
   on.exit(trait_vars <<- keep)
   compare_groups(traits_all, "Analyzed", "Excluded")
 })
-say("\n--- Same contrast, BFI-2 scored as in the published pipeline ---")
-show_obj(fmt(pub_res, "Analyzed", "Excluded"))
-write.csv(pub_res, file.path(out_dir, "trait_comparison_analyzed_vs_excluded_pubBFI.csv"),
+say("\n--- Same contrast, BFI-2 scored as the MANUSCRIPT scored it (unreversed) ---")
+show_obj(fmt(unrev_res, "Analyzed", "Excluded"))
+write.csv(unrev_res,
+          file.path(out_dir, "trait_comparison_analyzed_vs_excluded_unreversedBFI.csv"),
           row.names = FALSE)
+
+# Do the two scorings agree on which Big Five domains separate the groups?
+big5_rows <- function(d, strip) {
+  d <- d[sub(strip, "", d$measure) %in% names(big5_key), ]
+  data.frame(domain = sub(strip, "", d$measure),
+             g = round(d$g, 3),
+             p_FDR = round(d$p_fdr, 4),
+             sig = d$p_fdr < .05,
+             stringsAsFactors = FALSE)
+}
+cmp <- merge(big5_rows(main_res, "$^"), big5_rows(unrev_res, "_unrev$"),
+             by = "domain", suffixes = c("_corrected", "_manuscript"))
+say("\nBig Five under both scorings (corrected = section 5 table, manuscript = unreversed):")
+show_obj(cmp)
+say("\n  domains agreeing on significance at FDR < .05: ",
+    sum(cmp$sig_corrected == cmp$sig_manuscript), " of ", nrow(cmp))
+say("  domains where the sign of g flips: ",
+    sum(sign(cmp$g_corrected) != sign(cmp$g_manuscript)))
 
 # Same comparison restricted to the tranche excluded for choice profile -- the
 # group the reviewer's concern is actually about.
@@ -808,9 +1023,10 @@ show_obj(style_res_choice)
 # Inter-domain correlations. In a well-behaved sample the five BFI-2 domains are
 # close to orthogonal; strong positive intercorrelation across all pairs means
 # one common factor is driving every scale, i.e. method variance.
-# Reported for the as-published scores: that is where the shared method variance
-# shows up, and it is what the published analysis actually used.
-big5_names <- paste0(names(big5_key), "_pub")
+# Computed on the UNREVERSED item means, which is where shared method variance
+# shows up. This is a response-style diagnostic, not the published scoring: the
+# published composites are reverse-scored and behave normally (section 4b).
+big5_names <- paste0(names(big5_key), "_unrev")
 inter_cor <- function(ids, label) {
   d <- traits_all[traits_all$user_id %in% ids, big5_names]
   d <- d[complete.cases(d), , drop = FALSE]
@@ -820,7 +1036,8 @@ inter_cor <- function(ids, label) {
               label, nrow(d), mean(offdiag), min(offdiag), max(offdiag)))
   cm
 }
-say("BFI-2 inter-domain correlations (as-published scoring):")
+say("BFI-2 inter-domain correlations (UNREVERSED items -- acquiescence",
+    "\ndiagnostic, NOT the published scoring):")
 cm_an <- inter_cor(final_ids, "Analyzed")
 cm_ex <- inter_cor(traits_all$user_id[traits_all$group == "Excluded"], "Excluded (all)")
 invisible(inter_cor(traits_all$user_id[traits_all$stage == "Excluded: choice profile"],
@@ -1061,23 +1278,15 @@ say("1. Trait comparisons cover GRiPS, Berlin and subjective numeracy, the five"
 say("2. The reviewer also raises decision-making responsibility toward others.",
     "\n   No responsibility measure was administered, so that specific claim cannot",
     "\n   be tested here and should be conceded as a limitation.")
-say("3. Section 4b documents a separate problem found while reproducing the",
-    "\n   composites: the stored BFI-2 domain scores are plain item means with",
-    "\n   no reverse-scoring, so they are dominated by acquiescence (mean",
-    "\n   inter-domain r = .80, where the instrument is built for near-zero).",
-    "\n   Section 5 reports the exclusion comparison under both scorings and the",
-    "\n   answer to the reviewer holds either way.",
-    "\n   This does NOT propagate to the manuscript. The stored composites are",
-    "\n   carried into final_table via first(Extraversion) etc. but never enter",
-    "\n   any reported analysis -- they appear in neither independent_vars set.",
-    "\n   Every published Big Five result is item-level ridge importance,",
-    "\n   abs(coef(ridge_model)[-1]) with standardize = TRUE, which is exactly",
-    "\n   invariant to reverse-scoring: flipping an item flips the sign of its",
-    "\n   coefficient and leaves the magnitude unchanged (verified on these items,",
-    "\n   max difference 4e-16, with all 30 reverse-keyed signs flipping). The",
-    "\n   Agreeableness/time result (FDR p = .039) is therefore unchanged, and no",
-    "\n   manuscript re-derivation is required. Only the section 5 comparison",
-    "\n   above is affected by the keying.")
+say("3. The BFI-2 domain columns originally distributed with this project were",
+    "\n   unreversed item means (verified against the pre-fix backup: exact",
+    "\n   match to rowMeans over unreversed items, mean inter-domain r = +.68).",
+    "\n   fix_bfi2_composites.R re-scored them on 2026-09-10, so section 5 uses",
+    "\n   the corrected keying while the manuscript reports the unreversed ones.",
+    "\n   No reported result changes: the composites never enter a published",
+    "\n   analysis, and the item-level ridge importances are invariant to",
+    "\n   reverse-scoring (max difference 4e-16). The exclusion comparison in",
+    "\n   section 5 holds under either scoring.")
 say("4. The section 7 proxy is a static logistic model. It recovers sensitivity",
     "\n   to harm and cure but has no analogue of the relative-onset (time)",
     "\n   parameter, so it can show that the magnitude effects are not an artifact",

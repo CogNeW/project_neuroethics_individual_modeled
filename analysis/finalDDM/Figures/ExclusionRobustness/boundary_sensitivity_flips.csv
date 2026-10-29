@@ -1,0 +1,11 @@
+"user_id","n_untrimmed","p_untrimmed","n_trimmed","p_trimmed","actually_retained","retained_if_rule_applied_pre_trimming"
+"AbEkDeHe",75,0.1067,67,0.0896,FALSE,TRUE
+"BemKc0pg",75,0.1067,72,0.0972,FALSE,TRUE
+"xTDQTle7",75,0.1067,71,0.0986,FALSE,TRUE
+"NoFbwxGR",75,0.12,69,0.0725,FALSE,TRUE
+"YbBVLu6T",75,0.12,67,0.0896,FALSE,TRUE
+"4fLRTS44",75,0.1333,70,0.1,FALSE,TRUE
+"5aKXQjiP",75,0.1333,63,0.0794,FALSE,TRUE
+"NUekQutS",74,0.8243,59,0.9153,FALSE,TRUE
+"qZpCpXBn",75,0.8933,66,0.9242,FALSE,TRUE
+"7H7bbPAV",73,0.9041,66,0.8939,TRUE,FALSE

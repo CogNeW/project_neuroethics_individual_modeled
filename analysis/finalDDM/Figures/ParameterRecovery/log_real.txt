@@ -1,0 +1,85 @@
+Warning messages:
+1: package 'dplyr' was built under R version 4.2.3 
+2: package 'tidyr' was built under R version 4.2.3 
+3: package 'ggplot2' was built under R version 4.2.3 
+4: package 'runjags' was built under R version 4.2.3 
+5: package 'coda' was built under R version 4.2.3 
+
+==== Stage 1: individual latency posteriors (n = 376 ) ====
+Posterior mean > 0: 337   < 0: 39 
+
+  Cure first (95% CrI < 0)   Harm first (95% CrI > 0) 
+                         5                        134 
+Uncertain (CrI includes 0) 
+                       237 
+Posterior SD: median 0.286 IQR 0.221-0.346 s
+Group-level SD of posterior means: 0.232 s
+P(time > 0) >= .95: 186   <= .05: 7 
+Stage 2 (real): using cached C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM/Figures/ParameterRecovery/simulated_data_real.RData
+Stage 3 (real): fitting M1 in JAGS, started 2026-09-15 12:54:17
+INFO: Could not find files for the given pattern(s).
+INFO: Could not find files for the given pattern(s).
+INFO: Could not find files for the given pattern(s).
+INFO: Could not find files for the given pattern(s).
+Calling 3 simulations using the parallel method...
+Following the progress of chain 1 (the program will wait for all chains
+to finish before continuing):
+Welcome to JAGS 4.3.1 on Tue Sep 15 12:54:22 2026
+JAGS is free software and comes with ABSOLUTELY NO WARRANTY
+Loading module: basemod: ok
+Loading module: bugs: ok
+. Loading module: wiener: ok
+. . Reading data file data.txt
+. Compiling model graph
+   Resolving undeclared variables
+   Allocating nodes
+Graph information:
+   Observed stochastic nodes: 25975
+   Unobserved stochastic nodes: 29431
+   Total graph size: 491347
+. Reading parameter file inits1.txt
+. Initializing model
+. Adapting 1000
+-------------------------------------------------| 1000
+++++++++++++++++++++++++++++++++++++++++++++++++++ 100%
+Adaptation successful
+. Updating 1000
+-------------------------------------------------| 1000
+************************************************** 100%
+. . . . . . . . . . . . . Updating 5000
+-------------------------------------------------| 5000
+************************************************** 100%
+. . . . Updating 0
+. Deleting model
+All chains have finished
+Simulation complete.  Reading coda files...
+Coda files loaded successfully
+Finished running the simulation
+Stage 3 (real): finished 2026-09-15 14:14:29
+          Point est. Upper C.I.
+time.mu        1.035      1.117
+b_gain.mu      1.038      1.126
+b_risk.mu      1.014      1.049
+alpha.mu       1.024      1.084
+theta.mu       1.002      1.006
+bias.mu        1.006      1.021
+
+==== Stage 4 (real) ====
+# A tibble: 6 × 6
+  scenario parameter     r shrinkage_slope   rmse coverage_95
+  <chr>    <chr>     <dbl>           <dbl>  <dbl>       <dbl>
+1 real     alpha     0.970           0.970 0.147        0.888
+2 real     b_gain    0.810           0.697 0.523        0.955
+3 real     b_risk    0.916           0.850 0.453        0.955
+4 real     bias      0.834           0.847 0.0366       0.960
+5 real     theta     0.973           0.922 0.0434       0.941
+6 real     time      0.798           0.587 0.171        0.939
+
+Latency sign: true vs recovered posterior mean
+            recovered
+true         cure first harm first
+  cure first         32          7
+  harm first         11        326
+Sign agreement: 0.952   True harm-first: 337 / 376   Recovered harm-first: 333 / 376 
+Recovered classification (95% CrI): harm first 193 | cure first 7 | uncertain 176 
+Group-level time.mu: true mean of individual values 0.356  recovered 0.259  95% CrI [ 0.223, 0.296 ]

@@ -92,6 +92,8 @@ run_jags_model <- function(model_file, model_name, monitor) {
     inits = inits,
     plots = FALSE,
     method = "parallel",
+    # summarise=FALSE: skip runjags' summary stats over ~26k monitored nodes.
+    summarise = FALSE,
     module = "wiener",
     burnin = 1000,
     sample = 5000,
@@ -99,7 +101,15 @@ run_jags_model <- function(model_file, model_name, monitor) {
   )
 
   mcmc_samples <- coda::as.mcmc.list(results)
-  posterior_samples <- mcmc_samples %>% tidybayes::tidy_draws()
+
+  # Do NOT run tidy_draws() across all ~26k monitored nodes -- it copies the
+  # entire draws array into a tibble just to reach a handful of parameters.
+  # Tidy only the non-ld_comp columns; deviance and ld_comp are pulled
+  # directly out of the mcmc.list in calculate_indices().
+  par_cols <- grep("^ld_comp\\[", coda::varnames(mcmc_samples),
+                   invert = TRUE, value = TRUE)
+  posterior_samples <- mcmc_samples[, par_cols, drop = FALSE] %>%
+    tidybayes::tidy_draws()
 
   list(
     results = results,
@@ -108,35 +118,70 @@ run_jags_model <- function(model_file, model_name, monitor) {
   )
 }
 
-# Run models (change the paths for the files I sent)
-m0_results <- run_jags_model("C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM/stddm_model_M0.txt", "M0", monitor_0)
-m1_results <- run_jags_model("C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM/stddm_model_M1.txt", "M1", monitor_1)
-
 # model comparison indices
-calculate_indices <- function(posterior_samples, mcmc_samples) {
+calculate_indices <- function(mcmc_samples) {
   # Calculate DIC (sigh... just do it by hand I guess)
-  deviance_samples <- posterior_samples$deviance
+  deviance_samples <- unlist(lapply(mcmc_samples, function(ch) ch[, "deviance"]),
+                             use.names = FALSE)
   D_bar <- mean(deviance_samples)
   D_hat <- min(deviance_samples)
   pD <- D_bar - D_hat
   DIC <- D_hat + 2 * pD
 
-  # Calculate LOO and WAIC
-  log_lik_list <- lapply(mcmc_samples, function(chain) {
-    matrix(chain[, grep("ld_comp", colnames(chain))], ncol = nrow(risk_data))
-  })
-  log_lik <- do.call(rbind, log_lik_list)
-  chain_id <- rep(seq_along(mcmc_samples), each = nrow(mcmc_samples[[1]]))
-  r_eff <- loo::relative_eff(exp(log_lik), chain_id = chain_id, cores = 4)
-  loo_result <- loo::loo(log_lik, r_eff = r_eff, cores = 4)
-  waic_result <- loo::waic(log_lik)
+  # Calculate LOO and WAIC.
+  # Build log_lik into a preallocated matrix, one chain at a time. The old
+  # lapply + do.call(rbind) held the per-chain list AND the bound copy at the
+  # same time, doubling peak memory on a matrix that is already ~3.1 GB here
+  # (15000 draws x 25975 trials x 8 bytes).
+  ld_cols <- grep("^ld_comp\\[", colnames(mcmc_samples[[1]]))
+  n_obs <- length(ld_cols)
+  n_chain <- length(mcmc_samples)
+  n_iter <- nrow(mcmc_samples[[1]])
+  stopifnot(n_obs == nrow(risk_data))
 
-  list(DIC = DIC, LOO = loo_result, WAIC = waic_result)
+  log_lik <- matrix(NA_real_, nrow = n_chain * n_iter, ncol = n_obs)
+  for (k in seq_len(n_chain)) {
+    log_lik[((k - 1) * n_iter + 1):(k * n_iter), ] <-
+      as.matrix(mcmc_samples[[k]][, ld_cols, drop = FALSE])
+  }
+  chain_id <- rep(seq_len(n_chain), each = n_iter)
+
+  ll_exp <- exp(log_lik)
+  r_eff <- loo::relative_eff(ll_exp, chain_id = chain_id, cores = 4)
+  rm(ll_exp)
+  gc()
+  loo_result <- loo::loo(log_lik, r_eff = r_eff, cores =4)
+  waic_result <- loo::waic(log_lik)
+  rm(log_lik)
+  gc()
+
+  list(
+    DIC = DIC, LOO = loo_result, WAIC = waic_result,
+    pareto_k = loo::pareto_k_table(loo_result)
+  )
 }
 
-# Compute indices for models
-m0_indices <- calculate_indices(m0_results$posterior_samples, m0_results$mcmc_samples)
-m1_indices <- calculate_indices(m1_results$posterior_samples, m1_results$mcmc_samples)
+# Fit one model, compute its indices, then drop the draws before touching the
+# next model. Previously m0_results and m1_results were both held in memory
+# (~3.1 GB of draws each) while the indices were computed, roughly doubling
+# peak usage for no reason -- nothing downstream needs both at once.
+fit_and_index <- function(model_file, model_name, monitor) {
+  fit <- run_jags_model(model_file, model_name, monitor)
+  idx <- calculate_indices(fit$mcmc_samples)
+  params <- fit$posterior_samples
+  rm(fit)
+  gc()
+  list(indices = idx, posterior_samples = params)
+}
+
+# Run models (change the paths for the files I sent)
+m0_results <- fit_and_index("C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM/stddm_model_M0.txt", "M0", monitor_0)
+m1_results <- fit_and_index("C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents/classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit/DATA_ANALYSIS/analysis/finalDDM/stddm_model_M1.txt", "M1", monitor_1)
+
+# Indices are computed inside fit_and_index(), while that model's draws are
+# still loaded; only the small loo/waic/DIC objects survive.
+m0_indices <- m0_results$indices
+m1_indices <- m1_results$indices
 
 # Print model comparison results
 cat("\nModel Comparison Results:\n")
@@ -163,9 +208,45 @@ cat(sprintf(
   m1_indices$LOO$estimates["looic", "SE"]
 ))
 
-# Compare models using LOO function (model m1 stddm should win here)
-loo_comparison <- loo::loo_compare(m0_indices$LOO, m1_indices$LOO)
+# Compare models using LOO function (model m1 stddm should win here).
+# NOTE: report elpd_diff / se_diff from this table, NOT the absolute WAIC/LOO
+# SEs printed above. Those absolute SEs (~350) describe variability of each
+# model's total across all trials; se_diff is computed from the pointwise elpd
+# contrasts on the same observations, where the two models' errors are highly
+# correlated, so it is much smaller and is the correct uncertainty for the
+# comparison. Also note the scale: elpd_diff/se_diff are on the elpd scale,
+# while WAIC/LOOIC are on the -2*elpd scale. Do not mix them.
+loo_comparison <- loo::loo_compare(list(M0 = m0_indices$LOO, M1 = m1_indices$LOO))
 print(loo_comparison)
+
+cat(sprintf("\nBest model by PSIS-LOO: %s\n", rownames(loo_comparison)[1]))
+cat(sprintf(
+  "elpd_diff (%s vs %s): %.2f (se_diff: %.2f)\n",
+  rownames(loo_comparison)[2], rownames(loo_comparison)[1],
+  loo_comparison[2, "elpd_diff"], loo_comparison[2, "se_diff"]
+))
+
+# Pareto k diagnostics. Hierarchical DDMs on RT data often produce high-k
+# trials. If a nontrivial fraction exceed 0.7, PSIS-LOO is unreliable here --
+# the fix is loo::loo_moment_match() / reloo() / K-fold CV, NOT falling back on
+# WAIC or DIC, which degrade on the same observations (watch for the p_waic > 0.4
+# warning flagging the same trials).
+cat("\nPareto k diagnostics (M0):\n")
+print(m0_indices$pareto_k)
+cat("\nPareto k diagnostics (M1):\n")
+print(m1_indices$pareto_k)
+
+# This is trial-level LOO (ld_comp is per-trial), i.e. held-out trial
+# prediction -- not leave-one-participant-out.
+
+save(
+  m0_indices, m1_indices, loo_comparison,
+  file = file.path(
+    "C:/Users/Brian Kim/Documents/OneDrive - Drexel University/Documents",
+    "classes/cognew/Neuroethics/IndividualDifferenceRiskBenefit",
+    "DATA_ANALYSIS/analysis/finalDDM/model_comparison_indices.RData"
+  )
+)
 
 browser()
 
@@ -258,7 +339,9 @@ generate_predictions_time_ddm <- function(posterior_samples, data, n_pred = 100)
       delta <- sample$b_gain.mu * data$gain[j] + sample$b_risk.mu * data$risk[j]
       
       #ddm2_parallel(d_v, d_h, thres, nDT, tIn, bias, vd, hd, 1, N)
-      preds = ddm2_parallel(sample$b_gain.mu,sample$b_risk.mu,sample$alpha.mu,sample$theta.mu,sample$time.mu,sample$bias.mu,data$gain[j],data$risk[j],1,1)
+      # tIn = -time.mu: in stddm_model_M1.txt time > 0 means harm (risk) enters first, but in
+      # 2ddm_r_cpp_M1.cpp tIn > 0 delays the hd term, which is risk here.
+      preds = ddm2_parallel(sample$b_gain.mu,sample$b_risk.mu,sample$alpha.mu,sample$theta.mu,-sample$time.mu,sample$bias.mu,data$gain[j],data$risk[j],1,1)
       predictions[j, i] <- preds
     }
   }
