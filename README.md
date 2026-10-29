@@ -1,4 +1,4 @@
-# Code for 'The Dynamics of Neuroethical Decisions Depend on Psychological Traits'
+# Code for 'Linking Traits and Behavior Through Computational Modeling of Neuroethical Decisions'
 
 > **Authors:**  
 > Brian Kim<sup>1</sup>, Kiante Fernandez<sup>1,2</sup>, John D. Medaglia<sup>1,3</sup>  
